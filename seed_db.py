@@ -57,32 +57,42 @@ customers = [
 ]
 conn.executemany("INSERT INTO customers (name, email, phone) VALUES (?, ?, ?)", customers)
 
-# Materials
-materials = [
-    ("Correia Transportadora Cabo de Aco Mercurio ST 800 N/mm", "M"),
-    ("Correia Transportadora Cabo de Aco Mercurio ST 1250 N/mm", "M"),
-    ("Correia Transportadora Cabo de Aco Mercurio ST 2000 N/mm", "M"),
-    ("Correia Transportadora Cabo de Aco Mercurio ST 3150 N/mm", "M"),
-    ("Correia Transportadora Lona PN 300/3 Poliester/Nylon 3 lonas", "M"),
-    ("Correia Transportadora Lona PN 500/4 Poliester/Nylon 4 lonas", "M"),
-    ("Correia Transportadora Lona PN 800/5 Poliester/Nylon 5 lonas", "M"),
-    ("Correia Transportadora Lona NN 300/3 Nylon/Nylon 3 lonas", "M"),
-    ("Correia Transportadora Lona NN 500/4 Nylon/Nylon 4 lonas", "M"),
-    ("Correia Transportadora Lona NN 630/4 Nylon/Nylon 4 lonas", "M"),
-    ("Correia Transportadora Aramida 1000 N/mm", "M"),
-    ("Correia Transportadora Aramida 1600 N/mm", "M"),
-    ("Correia Laminada 3 lonas texteis", "M"),
-    ("Correia Laminada 5 lonas texteis", "M"),
-    ("Correia Transportadora Tubular 800mm diametro", "M"),
-    ("Correia Transportadora Tubular 1200mm diametro", "M"),
-    ("Kit Emenda a Quente para Correia Cabo de Aco", "UN"),
-    ("Kit Emenda a Frio para Correia de Lona", "UN"),
-    ("Raspador Primario Mercurio linha pesada", "UN"),
-    ("Raspador Secundario Mercurio", "UN"),
-    ("Sistema de Monitoramento HX 170", "UN"),
-    ("Sistema de Monitoramento HX 270 avancado", "UN"),
+# Material Groups
+# 1=Cabo Leve, 2=Cabo Pesada, 3=Textil Leve, 4=Textil Pesada
+material_groups = [
+    ("Cabo Leve", "Correias de cabo de aco ate 1250 N/mm"),
+    ("Cabo Pesada", "Correias de cabo de aco acima de 1250 N/mm"),
+    ("Textil Leve", "Correias de lona, laminadas e tubulares leves"),
+    ("Textil Pesada", "Correias de lona pesada, aramida e tubulares pesadas"),
 ]
-conn.executemany("INSERT INTO materials (description, unit) VALUES (?, ?)", materials)
+conn.executemany("INSERT INTO material_groups (name, description) VALUES (?, ?)", material_groups)
+
+# Materials (description, unit, group_id)
+materials = [
+    ("Correia Transportadora Cabo de Aco Mercurio ST 800 N/mm", "M", 1),
+    ("Correia Transportadora Cabo de Aco Mercurio ST 1250 N/mm", "M", 1),
+    ("Correia Transportadora Cabo de Aco Mercurio ST 2000 N/mm", "M", 2),
+    ("Correia Transportadora Cabo de Aco Mercurio ST 3150 N/mm", "M", 2),
+    ("Correia Transportadora Lona PN 300/3 Poliester/Nylon 3 lonas", "M", 3),
+    ("Correia Transportadora Lona PN 500/4 Poliester/Nylon 4 lonas", "M", 3),
+    ("Correia Transportadora Lona PN 800/5 Poliester/Nylon 5 lonas", "M", 4),
+    ("Correia Transportadora Lona NN 300/3 Nylon/Nylon 3 lonas", "M", 3),
+    ("Correia Transportadora Lona NN 500/4 Nylon/Nylon 4 lonas", "M", 3),
+    ("Correia Transportadora Lona NN 630/4 Nylon/Nylon 4 lonas", "M", 4),
+    ("Correia Transportadora Aramida 1000 N/mm", "M", 4),
+    ("Correia Transportadora Aramida 1600 N/mm", "M", 4),
+    ("Correia Laminada 3 lonas texteis", "M", 3),
+    ("Correia Laminada 5 lonas texteis", "M", 4),
+    ("Correia Transportadora Tubular 800mm diametro", "M", 3),
+    ("Correia Transportadora Tubular 1200mm diametro", "M", 4),
+    ("Kit Emenda a Quente para Correia Cabo de Aco", "UN", 2),
+    ("Kit Emenda a Frio para Correia de Lona", "UN", 3),
+    ("Raspador Primario Mercurio linha pesada", "UN", 2),
+    ("Raspador Secundario Mercurio", "UN", 1),
+    ("Sistema de Monitoramento HX 170", "UN", 1),
+    ("Sistema de Monitoramento HX 270 avancado", "UN", 2),
+]
+conn.executemany("INSERT INTO materials (description, unit, group_id) VALUES (?, ?, ?)", materials)
 
 # Sales headers (status_id: 1=draft,2=pending,3=approved,4=in_production,5=shipped,6=delivered,7=invoiced,8=closed,9=cancelled)
 sales = [

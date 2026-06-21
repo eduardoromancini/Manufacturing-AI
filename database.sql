@@ -6,10 +6,18 @@ CREATE TABLE IF NOT EXISTS customers (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS material_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT
+);
+
 CREATE TABLE IF NOT EXISTS materials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     description TEXT NOT NULL,
-    unit TEXT DEFAULT 'UN'
+    unit TEXT DEFAULT 'UN',
+    group_id INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (group_id) REFERENCES material_groups(id)
 );
 
 CREATE TABLE IF NOT EXISTS resources (

@@ -16,7 +16,13 @@ def query(sql, params=()):
 
 ROUTES = {
     "/api/customers": "SELECT * FROM customers ORDER BY id",
-    "/api/materials": "SELECT * FROM materials ORDER BY id",
+    "/api/material_groups": "SELECT * FROM material_groups ORDER BY id",
+    "/api/materials": """
+        SELECT m.*, mg.name as group_name
+        FROM materials m
+        JOIN material_groups mg ON mg.id = m.group_id
+        ORDER BY m.id
+    """,
     "/api/resources": "SELECT * FROM resources ORDER BY type, code",
     "/api/statuses": "SELECT * FROM sales_status ORDER BY id",
     "/api/sales": """

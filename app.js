@@ -38,14 +38,14 @@ async function loadSection(name) {
   const count = document.getElementById("stageCount");
   const timer = document.getElementById("loadTime");
 
-  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", resources: "Resources", capacity: "Capacity", statuses: "Status" };
+  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", capacity: "Capacity", statuses: "Status" };
   count.textContent = labels[name] || name;
   body.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Loading...</div>';
   safeIcons();
 
   const t0 = performance.now();
   try {
-    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, resources: renderResources, capacity: renderCapacity, statuses: renderStatuses };
+    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, capacity: renderCapacity, statuses: renderStatuses };
     if (renderers[name]) await renderers[name](body);
   } catch (err) {
     body.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${err.message}</p></div>`;
@@ -560,11 +560,51 @@ async function renderMaterials(body) {
     data: enriched,
     columns: [
       { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "group_name", label: "Group", render: (v) => `<span class="tag tag-muted">${v}</span>` },
       { key: "description", label: "Description" },
       { key: "unit", label: "Unit", render: (v) => `<span class="tag tag-violet">${v}</span>` },
       { key: "used_in", label: "Used in", numeric: true, render: (v) => `${v} orders`, rawValue: (v) => v },
       { key: "total_qty", label: "Total Qty Sold", numeric: true, render: (v) => v.toLocaleString("pt-BR"), rawValue: (v) => v },
       { key: "revenue", label: "Total Revenue", numeric: true, render: (v) => `<strong>R$ ${fmt(v)}</strong>`, rawValue: (v) => v },
+    ],
+  });
+}
+
+async function renderMaterialGroups(body) {
+  const groups = await api("/api/material_groups");
+  const materials = await api("/api/materials");
+
+  const countByGroup = {};
+  const revenueByGroup = {};
+  materials.forEach((m) => {
+    countByGroup[m.group_id] = (countByGroup[m.group_id] || 0) + 1;
+  });
+
+  const items = await api("/api/items");
+  items.forEach((i) => {
+    const mat = materials.find((m) => m.id === i.material_id);
+    if (mat) {
+      revenueByGroup[mat.group_id] = (revenueByGroup[mat.group_id] || 0) + i.total_price;
+    }
+  });
+
+  const enriched = groups.map((g) => ({
+    ...g,
+    material_count: countByGroup[g.id] || 0,
+    total_revenue: revenueByGroup[g.id] || 0,
+  }));
+
+  body.innerHTML = '<div id="material-groups-table"></div>';
+
+  DataTable(document.getElementById("material-groups-table"), {
+    tableName: "material_groups",
+    data: enriched,
+    columns: [
+      { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "name", label: "Group", render: (v) => `<strong>${v}</strong>` },
+      { key: "description", label: "Description", render: (v) => v || "—" },
+      { key: "material_count", label: "Materials", numeric: true, rawValue: (v) => v },
+      { key: "total_revenue", label: "Total Revenue", numeric: true, render: (v) => `<strong>R$ ${fmt(v)}</strong>`, rawValue: (v) => v },
     ],
   });
 }
