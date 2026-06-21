@@ -675,11 +675,14 @@ function buildBuckets(startDate, horizonDays, xUnit) {
       buckets.push({ label: `W${wy}`, sublabel: `${mn} W${wm}`, date: d, span: 7, month: d.getMonth(), weekYear: wy });
     }
   } else if (xUnit === "months") {
-    const months = Math.ceil(horizonDays / 30);
-    for (let i = 0; i < months; i++) {
-      const d = new Date(start);
-      d.setMonth(d.getMonth() + i);
-      buckets.push({ label: `${MONTH_NAMES[d.getMonth()]}`, sublabel: `${d.getFullYear()}`, date: d, span: 30, month: d.getMonth() });
+    const endDate = addDays(start, horizonDays);
+    let cursor = new Date(start);
+    while (cursor < endDate) {
+      const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+      const bucketEnd = monthEnd < endDate ? monthEnd : endDate;
+      const daysInBucket = Math.round((bucketEnd - cursor) / 86400000) + (monthEnd < endDate ? 1 : 0);
+      buckets.push({ label: `${MONTH_NAMES[cursor.getMonth()]}`, sublabel: `${cursor.getFullYear()}`, date: new Date(cursor), span: daysInBucket, month: cursor.getMonth() });
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
     }
   }
   return buckets;
@@ -710,7 +713,12 @@ function getYLabel(yUnit) {
   return "h";
 }
 
-let capState = { horizon: 7, xUnit: "days", yUnit: "hours", selectedResources: null };
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+let capState = { horizon: 7, xUnit: "days", yUnit: "hours", selectedResources: null, startDate: todayStr() };
 
 async function renderCapacity(body) {
   const resources = await api("/api/resources");
@@ -718,6 +726,13 @@ async function renderCapacity(body) {
 
   body.innerHTML = `
     <div class="cap-controls">
+      <div class="cap-control-group">
+        <label class="cap-label">Start Date</label>
+        <div class="cap-start-date-wrap">
+          <input type="date" class="cap-date-input" id="capStartDate" value="${capState.startDate}" />
+          <button class="cap-btn cap-today-btn ${capState.startDate === todayStr() ? "active" : ""}" id="capToday" type="button">Today</button>
+        </div>
+      </div>
       <div class="cap-control-group">
         <label class="cap-label">Horizon</label>
         <div class="cap-horizon-btns">
@@ -775,18 +790,24 @@ async function renderCapacity(body) {
 
 function renderCapChart(activeRes) {
   const area = document.getElementById("cap-chart-area");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const startDate = new Date(capState.startDate + "T00:00:00");
 
-  const buckets = buildBuckets(today, capState.horizon, capState.xUnit);
+  const buckets = buildBuckets(startDate, capState.horizon, capState.xUnit);
   const yPerBucket = getYPerBucket(capState.yUnit, capState.xUnit);
   const yLabel = getYLabel(capState.yUnit);
 
   const resCount = capState.selectedResources === null ? activeRes.length : capState.selectedResources.size;
-  const maxY = yPerBucket * resCount;
 
   const maxBuckets = 90;
   const visibleBuckets = buckets.slice(0, maxBuckets);
+
+  // maxY based on largest bucket
+  let maxY = 0;
+  visibleBuckets.forEach((b) => {
+    const days = b.span || (capState.xUnit === "hours" ? 1/CAP_HOURS_PER_DAY : 1);
+    const val = getYValue(capState.yUnit) * days * resCount;
+    if (val > maxY) maxY = val;
+  });
 
   // Y axis ticks
   const yTicks = 5;
@@ -803,10 +824,12 @@ function renderCapChart(activeRes) {
     prevWeek = b.weekYear;
 
     const separatorClass = isNewWeek ? "cap-week-sep" : "";
-    const pct = maxY > 0 ? 100 : 0;
+    const bucketDays = b.span || (capState.xUnit === "hours" ? 1/CAP_HOURS_PER_DAY : 1);
+    const bucketY = getYValue(capState.yUnit) * bucketDays * resCount;
+    const pct = maxY > 0 ? (bucketY / maxY) * 100 : 0;
 
     barHtmlParts.push(`
-      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${maxY}${yLabel}">
+      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${Math.round(bucketY * 100)/100}${yLabel}">
         <div class="cap-bar" style="height:${pct}%"></div>
         <div class="cap-bar-labels">
           <span class="cap-bar-label">${b.label}</span>
@@ -849,7 +872,7 @@ function renderCapChart(activeRes) {
     <div class="section-panel">
       <div class="section-header">
         <span class="section-title"><i data-lucide="bar-chart-3"></i> Available Capacity</span>
-        <span class="section-meta">${visibleBuckets.length} buckets · ${resCount} resource${resCount > 1 ? "s" : ""} · max ${maxY}${yLabel}/bucket</span>
+        <span class="section-meta">${visibleBuckets.length} buckets · ${resCount} resource${resCount > 1 ? "s" : ""} · max ${Math.round(maxY*100)/100}${yLabel}/bucket</span>
       </div>
       <div class="cap-chart">
         <div class="cap-y-axis">
@@ -883,6 +906,16 @@ function renderCapChart(activeRes) {
 }
 
 function bindCapControls(body, activeRes) {
+  document.getElementById("capStartDate").addEventListener("change", (e) => {
+    capState.startDate = e.target.value;
+    renderCapacity(body);
+  });
+
+  document.getElementById("capToday").addEventListener("click", () => {
+    capState.startDate = todayStr();
+    renderCapacity(body);
+  });
+
   body.querySelectorAll(".cap-horizon-btns .cap-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       capState.horizon = parseInt(btn.dataset.h);
