@@ -675,9 +675,24 @@ async function renderRouting(body) {
         </table>
       </div>
     </div>
+    <div id="routing-table"></div>
   `;
 
   safeIcons();
+
+  DataTable(document.getElementById("routing-table"), {
+    tableName: "routing",
+    data: routing,
+    columns: [
+      { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "material_group_id", label: "Group ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "group_name", label: "Material Group", render: (v) => `<strong>${v}</strong>` },
+      { key: "resource_id", label: "Resource ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "resource_code", label: "Resource Code", render: (v) => `<span class="mono"><strong>${v}</strong></span>` },
+      { key: "resource_name", label: "Resource" },
+      { key: "time_per_unit", label: "Time/Unit", numeric: true, render: (v, row) => `${v} ${row.time_unit}`, rawValue: (v) => v },
+    ],
+  });
 }
 
 async function renderResources(body) {
