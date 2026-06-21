@@ -619,6 +619,8 @@ async function renderResources(body) {
 // ── Capacity ──
 
 const CAP_HOURS_PER_DAY = 24;
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY_NAMES_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 function addDays(date, n) {
   const d = new Date(date);
@@ -626,14 +628,23 @@ function addDays(date, n) {
   return d;
 }
 
-function fmtDate(d) {
-  return d.toISOString().slice(0, 10);
-}
-
 function fmtDateShort(d) {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}`;
+}
+
+function getISOWeek(d) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + 3 - ((date.getDay() + 6) % 7));
+  const jan4 = new Date(date.getFullYear(), 0, 4);
+  return 1 + Math.round(((date - jan4) / 86400000 - 3 + ((jan4.getDay() + 6) % 7)) / 7);
+}
+
+function getWeekOfMonth(d) {
+  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+  return Math.ceil((d.getDate() + firstDay.getDay()) / 7);
 }
 
 function buildBuckets(startDate, horizonDays, xUnit) {
@@ -645,27 +656,29 @@ function buildBuckets(startDate, horizonDays, xUnit) {
       const d = new Date(start);
       d.setHours(d.getHours() + h);
       const hh = String(d.getHours()).padStart(2, "0");
-      buckets.push({ label: `${fmtDateShort(d)} ${hh}h`, date: d });
+      buckets.push({ label: `${hh}h`, sublabel: fmtDateShort(d), date: d, month: d.getMonth(), weekYear: getISOWeek(d) });
     }
   } else if (xUnit === "days") {
     for (let i = 0; i < horizonDays; i++) {
       const d = addDays(start, i);
-      buckets.push({ label: fmtDateShort(d), date: d });
+      const dow = DAY_NAMES_SHORT[d.getDay()];
+      buckets.push({ label: `${fmtDateShort(d)}`, sublabel: dow, date: d, month: d.getMonth(), weekYear: getISOWeek(d) });
     }
   } else if (xUnit === "weeks") {
     const weeks = Math.ceil(horizonDays / 7);
     for (let i = 0; i < weeks; i++) {
       const d = addDays(start, i * 7);
-      const end = addDays(d, 6);
-      buckets.push({ label: `${fmtDateShort(d)}–${fmtDateShort(end)}`, date: d, span: 7 });
+      const wy = getISOWeek(d);
+      const wm = getWeekOfMonth(d);
+      const mn = MONTH_NAMES[d.getMonth()];
+      buckets.push({ label: `W${wy}`, sublabel: `${mn} W${wm}`, date: d, span: 7, month: d.getMonth(), weekYear: wy });
     }
   } else if (xUnit === "months") {
     const months = Math.ceil(horizonDays / 30);
     for (let i = 0; i < months; i++) {
       const d = new Date(start);
       d.setMonth(d.getMonth() + i);
-      const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      buckets.push({ label: `${names[d.getMonth()]} ${d.getFullYear()}`, date: d, span: 30 });
+      buckets.push({ label: `${MONTH_NAMES[d.getMonth()]}`, sublabel: `${d.getFullYear()}`, date: d, span: 30, month: d.getMonth() });
     }
   }
   return buckets;
@@ -673,6 +686,7 @@ function buildBuckets(startDate, horizonDays, xUnit) {
 
 function getYValue(yUnit) {
   if (yUnit === "hours") return CAP_HOURS_PER_DAY;
+  if (yUnit === "days") return 1;
   if (yUnit === "minutes") return CAP_HOURS_PER_DAY * 60;
   if (yUnit === "shifts") return 3;
   return CAP_HOURS_PER_DAY;
@@ -689,6 +703,7 @@ function getYPerBucket(yUnit, xUnit) {
 
 function getYLabel(yUnit) {
   if (yUnit === "hours") return "h";
+  if (yUnit === "days") return "d";
   if (yUnit === "minutes") return "min";
   if (yUnit === "shifts") return "shifts";
   return "h";
@@ -725,6 +740,7 @@ async function renderCapacity(body) {
         <label class="cap-label">Y Axis</label>
         <select class="cap-select" id="capYUnit">
           <option value="hours" ${capState.yUnit === "hours" ? "selected" : ""}>Hours</option>
+          <option value="days" ${capState.yUnit === "days" ? "selected" : ""}>Days</option>
           <option value="minutes" ${capState.yUnit === "minutes" ? "selected" : ""}>Minutes</option>
           <option value="shifts" ${capState.yUnit === "shifts" ? "selected" : ""}>Shifts (8h)</option>
         </select>
@@ -757,14 +773,58 @@ function renderCapChart(activeRes) {
   const resCount = capState.resource === "all" ? activeRes.length : 1;
   const maxY = yPerBucket * resCount;
 
-  const maxBuckets = 60;
+  const maxBuckets = 90;
   const visibleBuckets = buckets.slice(0, maxBuckets);
 
   // Y axis ticks
   const yTicks = 5;
   const yStep = maxY / yTicks;
   const yTicksArr = [];
-  for (let i = yTicks; i >= 0; i--) yTicksArr.push(Math.round(yStep * i * 10) / 10);
+  for (let i = yTicks; i >= 0; i--) yTicksArr.push(Math.round(yStep * i * 100) / 100);
+
+  // Build month/week separator info
+  let prevMonth = null;
+  let prevWeek = null;
+  const barHtmlParts = [];
+
+  visibleBuckets.forEach((b, idx) => {
+    const isNewMonth = prevMonth !== null && b.month !== prevMonth;
+    const isNewWeek = capState.xUnit === "days" && prevWeek !== null && b.weekYear !== prevWeek;
+    prevMonth = b.month;
+    prevWeek = b.weekYear;
+
+    let separatorClass = "";
+    if (isNewMonth) separatorClass = "cap-month-sep";
+    else if (isNewWeek) separatorClass = "cap-week-sep";
+
+    const pct = maxY > 0 ? 100 : 0;
+
+    barHtmlParts.push(`
+      <div class="cap-bar-col ${separatorClass}" title="${b.sublabel} ${b.label}: ${maxY}${yLabel}">
+        <div class="cap-bar" style="height:${pct}%"></div>
+        <div class="cap-bar-labels">
+          <span class="cap-bar-label">${b.label}</span>
+          <span class="cap-bar-sublabel">${b.sublabel}</span>
+        </div>
+      </div>`);
+  });
+
+  // Month header bands
+  const monthBands = [];
+  if (capState.xUnit === "days" || capState.xUnit === "hours") {
+    let runStart = 0;
+    let runMonth = visibleBuckets[0]?.month;
+    visibleBuckets.forEach((b, i) => {
+      if (b.month !== runMonth || i === visibleBuckets.length - 1) {
+        const end = b.month !== runMonth ? i : i + 1;
+        const m = runMonth;
+        const yr = visibleBuckets[runStart].date.getFullYear();
+        monthBands.push({ start: runStart, span: end - runStart, label: `${MONTH_NAMES[m]} ${yr}` });
+        runStart = i;
+        runMonth = b.month;
+      }
+    });
+  }
 
   area.innerHTML = `
     <div class="section-panel">
@@ -772,6 +832,11 @@ function renderCapChart(activeRes) {
         <span class="section-title"><i data-lucide="bar-chart-3"></i> Available Capacity</span>
         <span class="section-meta">${visibleBuckets.length} buckets · ${resCount} resource${resCount > 1 ? "s" : ""} · max ${maxY}${yLabel}/bucket</span>
       </div>
+      ${monthBands.length > 1 ? `
+        <div class="cap-month-bands">
+          ${monthBands.map((mb) => `<div class="cap-month-band" style="flex:${mb.span}"><span>${mb.label}</span></div>`).join("")}
+        </div>
+      ` : ""}
       <div class="cap-chart">
         <div class="cap-y-axis">
           ${yTicksArr.map((t) => `<div class="cap-y-tick"><span>${t}${yLabel}</span></div>`).join("")}
@@ -781,14 +846,7 @@ function renderCapChart(activeRes) {
             ${yTicksArr.map(() => `<div class="cap-grid-line"></div>`).join("")}
           </div>
           <div class="cap-bars">
-            ${visibleBuckets.map((b) => {
-              const pct = maxY > 0 ? (maxY / maxY) * 100 : 0;
-              return `
-                <div class="cap-bar-col" title="${b.label}: ${maxY}${yLabel} available">
-                  <div class="cap-bar" style="height:${pct}%"></div>
-                  <span class="cap-bar-label">${b.label}</span>
-                </div>`;
-            }).join("")}
+            ${barHtmlParts.join("")}
           </div>
         </div>
       </div>

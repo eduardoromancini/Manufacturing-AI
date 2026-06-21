@@ -746,7 +746,7 @@
 .cap-chart {
   display: flex;
   padding: 22px 22px 10px;
-  height: 320px;
+  height: 350px;
 }
 
 .cap-y-axis {
@@ -754,7 +754,7 @@
   flex-direction: column;
   justify-content: space-between;
   padding-right: 12px;
-  padding-bottom: 28px;
+  padding-bottom: 44px;
 }
 
 .cap-y-tick {
@@ -779,7 +779,7 @@
 
 .cap-grid-lines {
   position: absolute;
-  inset: 0 0 28px 0;
+  inset: 0 0 44px 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -795,7 +795,7 @@
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: calc(100% - 28px);
+  height: calc(100% - 44px);
   min-width: min-content;
 }
 
@@ -824,14 +824,61 @@
   opacity: 1;
 }
 
+.cap-bar-labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding-top: 4px;
+  min-height: 34px;
+}
+
 .cap-bar-label {
-  font-size: 0.62rem;
-  font-weight: 700;
+  font-size: 0.66rem;
+  font-weight: 750;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.cap-bar-sublabel {
+  font-size: 0.58rem;
+  font-weight: 600;
   color: var(--muted);
   white-space: nowrap;
-  transform: rotate(-45deg);
-  transform-origin: center;
-  height: 22px;
+}
+
+.cap-month-sep {
+  border-left: 2px solid var(--coral);
+  margin-left: 4px;
+  padding-left: 4px;
+}
+
+.cap-week-sep {
+  border-left: 1px dashed var(--line-strong);
+  margin-left: 2px;
+  padding-left: 2px;
+}
+
+.cap-month-bands {
+  display: flex;
+  padding: 0 22px 0 60px;
+  gap: 2px;
+}
+
+.cap-month-band {
+  text-align: center;
+  padding: 6px 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 3px solid var(--teal);
+}
+
+.cap-month-band:nth-child(even) {
+  color: var(--violet);
+  border-bottom-color: var(--violet);
 }
 
 /* ── DataTable ── */
