@@ -601,6 +601,8 @@ async function renderResources(body) {
     columns: [
       { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "code", label: "Code", render: (v) => `<span class="mono"><strong>${v}</strong></span>` },
+      { key: "short_desc", label: "Short Desc" },
+      { key: "resource_group", label: "Group", render: (v) => `<span class="tag tag-muted">${v}</span>` },
       { key: "description", label: "Description" },
       { key: "type", label: "Type", render: (v) => {
         const ts = RESOURCE_TYPE_STYLE[v] || { cls: "tag-muted", icon: "circle" };
@@ -718,11 +720,13 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
-let capState = { horizon: 7, xUnit: "days", yUnit: "hours", selectedResources: null, startDate: todayStr() };
+let capState = { horizon: 7, xUnit: "days", yUnit: "hours", selectedResources: null, selectedGroups: null, startDate: todayStr() };
 
 async function renderCapacity(body) {
   const resources = await api("/api/resources");
   const activeRes = resources.filter((r) => r.status === "active");
+
+  const filteredRes = activeRes.filter((r) => capState.selectedGroups === null || capState.selectedGroups.has(r.resource_group));
 
   body.innerHTML = `
     <div class="cap-controls">
@@ -761,21 +765,21 @@ async function renderCapacity(body) {
           <option value="shifts" ${capState.yUnit === "shifts" ? "selected" : ""}>Shifts (8h)</option>
         </select>
       </div>
-      <div class="cap-control-group cap-control-full">
-        <div class="cap-resources-header">
-          <label class="cap-label">Resources</label>
-          <button class="cap-toggle-all-btn" id="capToggleAll" type="button">Toggle all</button>
+      <div class="cap-control-group">
+        <label class="cap-label">Group</label>
+        <div class="cap-resource-toggles" id="capGroupToggles">
+          ${[...new Set(activeRes.map((r) => r.resource_group))].map((g) => {
+            const on = capState.selectedGroups === null || capState.selectedGroups.has(g);
+            return `<label class="cap-resource-toggle ${on ? "on" : ""}" data-group="${g}"><input type="checkbox" ${on ? "checked" : ""} data-group="${g}" /><span class="cap-toggle-code">${g}</span></label>`;
+          }).join("")}
         </div>
+      </div>
+      <div class="cap-control-group">
+        <label class="cap-label">Resources</label>
         <div class="cap-resource-toggles" id="capResourceToggles">
-          ${activeRes.map((r) => {
+          ${filteredRes.map((r) => {
             const checked = capState.selectedResources === null || capState.selectedResources.has(r.id);
-            const ts = RESOURCE_TYPE_STYLE[r.type] || { cls: "tag-muted" };
-            return `
-              <label class="cap-resource-toggle ${checked ? "on" : ""}" data-id="${r.id}">
-                <input type="checkbox" ${checked ? "checked" : ""} data-id="${r.id}" />
-                <span class="cap-toggle-code">${r.code}</span>
-                <span class="cap-toggle-desc">${r.description}</span>
-              </label>`;
+            return `<label class="cap-resource-toggle ${checked ? "on" : ""}" data-id="${r.id}"><input type="checkbox" ${checked ? "checked" : ""} data-id="${r.id}" /><span class="cap-toggle-code">${r.short_desc}</span></label>`;
           }).join("")}
         </div>
       </div>
@@ -783,12 +787,13 @@ async function renderCapacity(body) {
     <div id="cap-chart-area"></div>
   `;
 
-  renderCapChart(activeRes);
+  renderCapChart(activeRes, filteredRes);
   bindCapControls(body, activeRes);
   safeIcons();
 }
 
-function renderCapChart(activeRes) {
+function renderCapChart(activeRes, filteredRes) {
+  if (!filteredRes) filteredRes = activeRes;
   const area = document.getElementById("cap-chart-area");
   const startDate = new Date(capState.startDate + "T00:00:00");
 
@@ -796,7 +801,8 @@ function renderCapChart(activeRes) {
   const yPerBucket = getYPerBucket(capState.yUnit, capState.xUnit);
   const yLabel = getYLabel(capState.yUnit);
 
-  const resCount = capState.selectedResources === null ? activeRes.length : capState.selectedResources.size;
+  const selectedRes = filteredRes.filter((r) => capState.selectedResources === null || capState.selectedResources.has(r.id));
+  const resCount = selectedRes.length;
 
   const maxBuckets = 90;
   const visibleBuckets = buckets.slice(0, maxBuckets);
@@ -933,31 +939,44 @@ function bindCapControls(body, activeRes) {
     renderCapacity(body);
   });
 
-  document.getElementById("capToggleAll").addEventListener("click", () => {
-    const allOn = capState.selectedResources === null || capState.selectedResources.size === activeRes.length;
-    if (allOn) {
-      capState.selectedResources = new Set();
-    } else {
+  // Group toggles
+  document.querySelectorAll("#capGroupToggles input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const grp = cb.dataset.group;
+      const allGroups = [...new Set(activeRes.map((r) => r.resource_group))];
+      if (capState.selectedGroups === null) {
+        capState.selectedGroups = new Set(allGroups);
+      }
+      if (cb.checked) {
+        capState.selectedGroups.add(grp);
+      } else {
+        capState.selectedGroups.delete(grp);
+      }
+      if (capState.selectedGroups.size === allGroups.length) {
+        capState.selectedGroups = null;
+      }
       capState.selectedResources = null;
-    }
-    renderCapacity(body);
+      renderCapacity(body);
+    });
   });
 
+  // Resource toggles
   document.querySelectorAll("#capResourceToggles input[type=checkbox]").forEach((cb) => {
     cb.addEventListener("change", () => {
       const id = parseInt(cb.dataset.id);
+      const filteredRes = activeRes.filter((r) => capState.selectedGroups === null || capState.selectedGroups.has(r.resource_group));
       if (capState.selectedResources === null) {
-        capState.selectedResources = new Set(activeRes.map((r) => r.id));
+        capState.selectedResources = new Set(filteredRes.map((r) => r.id));
       }
       if (cb.checked) {
         capState.selectedResources.add(id);
       } else {
         capState.selectedResources.delete(id);
       }
-      if (capState.selectedResources.size === activeRes.length) {
+      if (capState.selectedResources.size === filteredRes.length) {
         capState.selectedResources = null;
       }
-      renderCapChart(activeRes);
+      renderCapChart(activeRes, filteredRes);
       document.querySelectorAll("#capResourceToggles .cap-resource-toggle").forEach((lbl) => {
         const lid = parseInt(lbl.dataset.id);
         const isOn = capState.selectedResources === null || capState.selectedResources.has(lid);

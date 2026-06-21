@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS resources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
+    short_desc TEXT NOT NULL,
+    resource_group TEXT NOT NULL,
     type TEXT NOT NULL,
     capacity TEXT,
     location TEXT,

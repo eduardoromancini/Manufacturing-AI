@@ -23,21 +23,22 @@ statuses = [
 conn.executemany("INSERT INTO sales_status (name, description) VALUES (?, ?)", statuses)
 
 # Resources (code, description, type, capacity, location, status)
+# Resources: code, description, short_desc, resource_group, type, capacity, location, status
 resources = [
-    ("CAL-01", "Calandra 4 Rolos 2200mm - Revestimento de Lonas", "calandra", "2200mm largura / 15 t/h", "Galpao A - Calandragem", "active"),
-    ("CAL-02", "Calandra 4 Rolos 1800mm - Friccao de Borracha", "calandra", "1800mm largura / 12 t/h", "Galpao A - Calandragem", "active"),
-    ("CAL-03", "Calandra 3 Rolos 1600mm - Cobertura Superior/Inferior", "calandra", "1600mm largura / 10 t/h", "Galpao A - Calandragem", "maintenance"),
-    ("PRS-01", "Prensa Vulcanizadora Plana 12m x 2.2m", "prensa", "12m comprimento / 200 ton", "Galpao B - Vulcanizacao", "active"),
-    ("PRS-02", "Prensa Vulcanizadora Plana 8m x 1.8m", "prensa", "8m comprimento / 150 ton", "Galpao B - Vulcanizacao", "active"),
-    ("PRS-03", "Prensa Vulcanizadora Rotativa Continua", "prensa", "Continua / 180 ton", "Galpao B - Vulcanizacao", "active"),
-    ("PRS-04", "Prensa de Emenda a Quente Portatil", "prensa", "2.4m largura / 80 ton", "Galpao B - Vulcanizacao", "active"),
-    ("MNT-01", "Montadora de Correias Cabo de Aco - Linha 1", "montadora", "3200mm largura / ST ate 5000 N/mm", "Galpao C - Montagem", "active"),
-    ("MNT-02", "Montadora de Correias Cabo de Aco - Linha 2", "montadora", "2400mm largura / ST ate 3150 N/mm", "Galpao C - Montagem", "active"),
-    ("MNT-03", "Montadora de Correias de Lona PN/NN", "montadora", "2200mm largura / ate 5 lonas", "Galpao C - Montagem", "active"),
-    ("MNT-04", "Montadora de Correias Tubulares", "montadora", "1200mm diametro max", "Galpao C - Montagem", "inactive"),
+    ("CAL-01", "Calandra 4 Rolos 2200mm - Revestimento de Lonas", "Calandra 01", "Calandras", "calandra", "2200mm largura / 15 t/h", "Galpao A - Calandragem", "active"),
+    ("CAL-02", "Calandra 4 Rolos 1800mm - Friccao de Borracha", "Calandra 02", "Calandras", "calandra", "1800mm largura / 12 t/h", "Galpao A - Calandragem", "active"),
+    ("CAL-03", "Calandra 3 Rolos 1600mm - Cobertura Superior/Inferior", "Calandra 03", "Calandras", "calandra", "1600mm largura / 10 t/h", "Galpao A - Calandragem", "maintenance"),
+    ("PRS-01", "Prensa Vulcanizadora Plana 12m x 2.2m", "Prensa 01", "Prensas", "prensa", "12m comprimento / 200 ton", "Galpao B - Vulcanizacao", "active"),
+    ("PRS-02", "Prensa Vulcanizadora Plana 8m x 1.8m", "Prensa 02", "Prensas", "prensa", "8m comprimento / 150 ton", "Galpao B - Vulcanizacao", "active"),
+    ("PRS-03", "Prensa Vulcanizadora Rotativa Continua", "Prensa 03", "Prensas", "prensa", "Continua / 180 ton", "Galpao B - Vulcanizacao", "active"),
+    ("PRS-04", "Prensa de Emenda a Quente Portatil", "Prensa 04", "Prensas", "prensa", "2.4m largura / 80 ton", "Galpao B - Vulcanizacao", "active"),
+    ("MNT-01", "Montadora de Correias Cabo de Aco - Linha 1", "Montadora 01", "Montadoras", "montadora", "3200mm largura / ST ate 5000 N/mm", "Galpao C - Montagem", "active"),
+    ("MNT-02", "Montadora de Correias Cabo de Aco - Linha 2", "Montadora 02", "Montadoras", "montadora", "2400mm largura / ST ate 3150 N/mm", "Galpao C - Montagem", "active"),
+    ("MNT-03", "Montadora de Correias de Lona PN/NN", "Montadora 03", "Montadoras", "montadora", "2200mm largura / ate 5 lonas", "Galpao C - Montagem", "active"),
+    ("MNT-04", "Montadora de Correias Tubulares", "Montadora 04", "Montadoras", "montadora", "1200mm diametro max", "Galpao C - Montagem", "inactive"),
 ]
 conn.executemany(
-    "INSERT INTO resources (code, description, type, capacity, location, status) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO resources (code, description, short_desc, resource_group, type, capacity, location, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     resources,
 )
 
