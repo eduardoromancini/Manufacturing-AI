@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manufacturing.AI — Sales</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;850&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body class="installer-body">
+    <main class="installer" id="installer">
+      <aside class="rail" aria-label="Navigation">
+        <div class="rail-brand">
+          <p class="eyebrow">Manufacturing.AI</p>
+          <strong>Sales Dashboard</strong>
+        </div>
+
+        <nav class="rail-nav" id="railNav" aria-label="Sections">
+          <a class="rail-link active" href="#" data-section="sales">
+            <i data-lucide="shopping-bag"></i>
+            <span>Sales</span>
+          </a>
+          <a class="rail-link" href="#" data-section="items">
+            <i data-lucide="list"></i>
+            <span>Sales Items</span>
+          </a>
+          <a class="rail-link" href="#" data-section="customers">
+            <i data-lucide="users"></i>
+            <span>Customers</span>
+          </a>
+          <a class="rail-link" href="#" data-section="materials">
+            <i data-lucide="package"></i>
+            <span>Materials</span>
+          </a>
+          <a class="rail-link" href="#" data-section="resources">
+            <i data-lucide="factory"></i>
+            <span>Resources</span>
+          </a>
+          <a class="rail-link" href="#" data-section="statuses">
+            <i data-lucide="toggle-right"></i>
+            <span>Status</span>
+          </a>
+        </nav>
+
+        <div class="rail-foot">
+          <div class="rail-readiness">
+            <div class="readiness-label">
+              <i data-lucide="zap"></i>
+              <span>Q2 Target</span>
+            </div>
+            <div class="readiness-bar">
+              <div class="readiness-fill" id="targetFill" style="width: 0%"></div>
+            </div>
+            <span class="readiness-value" id="targetValue">Loading...</span>
+          </div>
+        </div>
+      </aside>
+
+      <section class="stage-wrap">
+        <header class="stage-top">
+          <span class="stage-count" id="stageCount">Sales</span>
+          <div class="stage-top-right">
+            <span class="load-time" id="loadTime"></span>
+          </div>
+        </header>
+
+        <div class="stage-body" id="stageBody" aria-live="polite">
+          <div class="loading">Loading...</div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,171 @@
+import sqlite3, os
+
+db_path = os.path.join(os.path.dirname(__file__), "manufacturing.db")
+if os.path.exists(db_path):
+    os.remove(db_path)
+
+conn = sqlite3.connect(db_path)
+conn.execute("PRAGMA foreign_keys = ON")
+conn.executescript(open("database.sql").read())
+
+# Sales Status
+statuses = [
+    ("draft", "Order created but not yet submitted"),
+    ("pending", "Awaiting internal approval"),
+    ("approved", "Approved and ready for production"),
+    ("in_production", "Materials being manufactured"),
+    ("shipped", "Order dispatched to customer"),
+    ("delivered", "Customer confirmed receipt"),
+    ("invoiced", "Invoice sent to customer"),
+    ("closed", "Payment received, order complete"),
+    ("cancelled", "Order cancelled"),
+]
+conn.executemany("INSERT INTO sales_status (name, description) VALUES (?, ?)", statuses)
+
+# Resources (code, description, type, capacity, location, status)
+resources = [
+    ("CAL-01", "Calandra 4 Rolos 2200mm - Revestimento de Lonas", "calandra", "2200mm largura / 15 t/h", "Galpao A - Calandragem", "active"),
+    ("CAL-02", "Calandra 4 Rolos 1800mm - Friccao de Borracha", "calandra", "1800mm largura / 12 t/h", "Galpao A - Calandragem", "active"),
+    ("CAL-03", "Calandra 3 Rolos 1600mm - Cobertura Superior/Inferior", "calandra", "1600mm largura / 10 t/h", "Galpao A - Calandragem", "maintenance"),
+    ("PRS-01", "Prensa Vulcanizadora Plana 12m x 2.2m", "prensa", "12m comprimento / 200 ton", "Galpao B - Vulcanizacao", "active"),
+    ("PRS-02", "Prensa Vulcanizadora Plana 8m x 1.8m", "prensa", "8m comprimento / 150 ton", "Galpao B - Vulcanizacao", "active"),
+    ("PRS-03", "Prensa Vulcanizadora Rotativa Continua", "prensa", "Continua / 180 ton", "Galpao B - Vulcanizacao", "active"),
+    ("PRS-04", "Prensa de Emenda a Quente Portatil", "prensa", "2.4m largura / 80 ton", "Galpao B - Vulcanizacao", "active"),
+    ("MNT-01", "Montadora de Correias Cabo de Aco - Linha 1", "montadora", "3200mm largura / ST ate 5000 N/mm", "Galpao C - Montagem", "active"),
+    ("MNT-02", "Montadora de Correias Cabo de Aco - Linha 2", "montadora", "2400mm largura / ST ate 3150 N/mm", "Galpao C - Montagem", "active"),
+    ("MNT-03", "Montadora de Correias de Lona PN/NN", "montadora", "2200mm largura / ate 5 lonas", "Galpao C - Montagem", "active"),
+    ("MNT-04", "Montadora de Correias Tubulares", "montadora", "1200mm diametro max", "Galpao C - Montagem", "inactive"),
+]
+conn.executemany(
+    "INSERT INTO resources (code, description, type, capacity, location, status) VALUES (?, ?, ?, ?, ?, ?)",
+    resources,
+)
+
+# Customers
+customers = [
+    ("Vale S.A.", "compras@vale.com", "+55 21 3485-3000"),
+    ("Gerdau", "suprimentos@gerdau.com.br", "+55 51 3323-2000"),
+    ("CSN - Companhia Siderurgica Nacional", "procurement@csn.com.br", "+55 24 3383-1000"),
+    ("Votorantim Cimentos", "compras@vcimentos.com.br", "+55 11 3593-8000"),
+    ("Usiminas", "materiais@usiminas.com", "+55 31 3499-8000"),
+    ("Mosaic Fertilizantes", "purchasing@mosaicco.com", "+55 11 3527-6000"),
+    ("Anglo American Brasil", "supply@angloamerican.com", "+55 31 3516-7000"),
+    ("Samarco Mineracao", "compras@samarco.com", "+55 31 3749-3000"),
+    ("Intercement Brasil", "suprimentos@intercement.com", "+55 11 2122-3000"),
+    ("MRN - Mineracao Rio do Norte", "compras@mrn.com.br", "+55 21 2555-5000"),
+]
+conn.executemany("INSERT INTO customers (name, email, phone) VALUES (?, ?, ?)", customers)
+
+# Materials
+materials = [
+    ("Correia Transportadora Cabo de Aco Mercurio ST 800 N/mm", "M"),
+    ("Correia Transportadora Cabo de Aco Mercurio ST 1250 N/mm", "M"),
+    ("Correia Transportadora Cabo de Aco Mercurio ST 2000 N/mm", "M"),
+    ("Correia Transportadora Cabo de Aco Mercurio ST 3150 N/mm", "M"),
+    ("Correia Transportadora Lona PN 300/3 Poliester/Nylon 3 lonas", "M"),
+    ("Correia Transportadora Lona PN 500/4 Poliester/Nylon 4 lonas", "M"),
+    ("Correia Transportadora Lona PN 800/5 Poliester/Nylon 5 lonas", "M"),
+    ("Correia Transportadora Lona NN 300/3 Nylon/Nylon 3 lonas", "M"),
+    ("Correia Transportadora Lona NN 500/4 Nylon/Nylon 4 lonas", "M"),
+    ("Correia Transportadora Lona NN 630/4 Nylon/Nylon 4 lonas", "M"),
+    ("Correia Transportadora Aramida 1000 N/mm", "M"),
+    ("Correia Transportadora Aramida 1600 N/mm", "M"),
+    ("Correia Laminada 3 lonas texteis", "M"),
+    ("Correia Laminada 5 lonas texteis", "M"),
+    ("Correia Transportadora Tubular 800mm diametro", "M"),
+    ("Correia Transportadora Tubular 1200mm diametro", "M"),
+    ("Kit Emenda a Quente para Correia Cabo de Aco", "UN"),
+    ("Kit Emenda a Frio para Correia de Lona", "UN"),
+    ("Raspador Primario Mercurio linha pesada", "UN"),
+    ("Raspador Secundario Mercurio", "UN"),
+    ("Sistema de Monitoramento HX 170", "UN"),
+    ("Sistema de Monitoramento HX 270 avancado", "UN"),
+]
+conn.executemany("INSERT INTO materials (description, unit) VALUES (?, ?)", materials)
+
+# Sales headers (status_id: 1=draft,2=pending,3=approved,4=in_production,5=shipped,6=delivered,7=invoiced,8=closed,9=cancelled)
+sales = [
+    (1, 8, 0),   # Vale - closed
+    (2, 8, 0),   # Gerdau - closed
+    (3, 7, 0),   # CSN - invoiced
+    (4, 4, 0),   # Votorantim - in_production
+    (5, 3, 0),   # Usiminas - approved
+    (6, 8, 0),   # Mosaic - closed
+    (7, 2, 0),   # Anglo American - pending
+    (8, 4, 0),   # Samarco - in_production
+    (9, 1, 0),   # Intercement - draft
+    (10, 5, 0),  # MRN - shipped
+]
+conn.executemany("INSERT INTO sales_header (customer_id, status_id, total_price) VALUES (?, ?, ?)", sales)
+
+# Sales items
+items = [
+    (1, 4, 1200, 5980.00, "2026-03-15"),
+    (1, 3, 800, 4120.00, "2026-03-15"),
+    (1, 17, 4, 8500.00, "2026-02-28"),
+    (1, 22, 2, 58000.00, "2026-04-01"),
+    (2, 6, 500, 680.00, "2026-04-10"),
+    (2, 7, 300, 1050.00, "2026-04-10"),
+    (2, 19, 6, 4600.00, "2026-03-20"),
+    (2, 20, 6, 2800.00, "2026-03-20"),
+    (3, 2, 600, 2740.00, "2026-05-01"),
+    (3, 15, 400, 2200.00, "2026-05-15"),
+    (3, 18, 3, 3200.00, "2026-04-20"),
+    (3, 21, 1, 32000.00, "2026-06-01"),
+    (4, 8, 350, 390.00, "2026-07-10"),
+    (4, 10, 250, 780.00, "2026-07-10"),
+    (4, 18, 2, 3200.00, "2026-06-25"),
+    (5, 11, 200, 3200.00, "2026-07-20"),
+    (5, 16, 300, 3400.00, "2026-08-01"),
+    (5, 17, 2, 8500.00, "2026-07-15"),
+    (6, 5, 800, 420.00, "2026-06-15"),
+    (6, 6, 600, 680.00, "2026-06-15"),
+    (6, 13, 400, 310.00, "2026-06-01"),
+    (6, 20, 4, 2800.00, "2026-05-20"),
+    (7, 4, 2000, 5980.00, "2026-08-15"),
+    (7, 12, 500, 4850.00, "2026-09-01"),
+    (7, 22, 3, 58000.00, "2026-09-15"),
+    (7, 19, 8, 4600.00, "2026-08-01"),
+    (8, 1, 1500, 1850.00, "2026-08-20"),
+    (8, 2, 1000, 2740.00, "2026-09-01"),
+    (8, 17, 6, 8500.00, "2026-08-10"),
+    (8, 19, 10, 4600.00, "2026-08-15"),
+    (9, 13, 600, 310.00, "2026-07-30"),
+    (9, 14, 300, 490.00, "2026-07-30"),
+    (9, 9, 400, 640.00, "2026-08-10"),
+    (10, 15, 800, 2200.00, "2026-09-10"),
+    (10, 16, 500, 3400.00, "2026-09-20"),
+    (10, 22, 1, 58000.00, "2026-10-01"),
+    (10, 21, 2, 32000.00, "2026-09-15"),
+]
+conn.executemany(
+    "INSERT INTO sales_items (sales_header_id, material_id, quantity, unit_price, due_date) VALUES (?, ?, ?, ?, ?)",
+    items,
+)
+
+conn.execute("""
+    UPDATE sales_header SET total_price = (
+        SELECT COALESCE(SUM(total_price), 0)
+        FROM sales_items
+        WHERE sales_items.sales_header_id = sales_header.id
+    )
+""")
+
+conn.commit()
+
+# Summary
+print("=== SALES STATUS ===")
+for r in conn.execute("SELECT id, name, description FROM sales_status"):
+    print(f"  {r[0]}. {r[1]:15s} — {r[2]}")
+
+print(f"\n=== SALES ===")
+for r in conn.execute("""
+    SELECT sh.id, c.name, ss.name, sh.total_price
+    FROM sales_header sh
+    JOIN customers c ON c.id = sh.customer_id
+    JOIN sales_status ss ON ss.id = sh.status_id
+    ORDER BY sh.id
+"""):
+    print(f"  #{r[0]:2d}  {r[2]:15s}  R$ {r[3]:>14,.2f}  {r[1]}")
+
+conn.close()
