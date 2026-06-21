@@ -1124,6 +1124,20 @@
   background: #f4f6f8;
 }
 
+.cap-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 16px;
+}
+
+.cap-multi-panel {
+  margin-bottom: 0;
+}
+
+.cap-chart-sm {
+  height: 220px;
+}
+
 /* ── DataTable ── */
 .dt-table-wrap {
   overflow-x: auto;

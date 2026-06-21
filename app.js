@@ -775,7 +775,7 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
-let capState = { horizon: 7, xUnit: "days", yUnit: "hours", selectedResources: null, selectedGroups: null, startDate: todayStr() };
+let capState = { horizon: 7, xUnit: "days", yUnit: "hours", selectedResources: null, selectedGroups: null, startDate: todayStr(), viewBy: "group" };
 
 async function renderCapacity(body) {
   const resources = await api("/api/resources");
@@ -844,6 +844,14 @@ async function renderCapacity(body) {
         </div>
       </div>
       <div class="cap-control-group">
+        <label class="cap-label">View By</label>
+        <div class="cap-horizon-btns">
+          <button class="cap-btn ${capState.viewBy === "group" ? "active" : ""}" data-view="group">Groups</button>
+          <button class="cap-btn ${capState.viewBy === "resource" ? "active" : ""}" data-view="resource">Resources</button>
+          <button class="cap-btn ${capState.viewBy === "all" ? "active" : ""}" data-view="all">Combined</button>
+        </div>
+      </div>
+      <div class="cap-control-group">
         <label class="cap-label">X Axis</label>
         <select class="cap-select" id="capXUnit">
           <option value="hours" ${capState.xUnit === "hours" ? "selected" : ""}>Hours</option>
@@ -888,22 +896,10 @@ async function renderCapacity(body) {
   safeIcons();
 }
 
-function renderCapChart(activeRes, filteredRes) {
-  if (!filteredRes) filteredRes = activeRes;
-  const area = document.getElementById("cap-chart-area");
-  const startDate = new Date(capState.startDate + "T00:00:00");
-
-  const buckets = buildBuckets(startDate, capState.horizon, capState.xUnit);
-  const yPerBucket = getYPerBucket(capState.yUnit, capState.xUnit);
-  const yLabel = getYLabel(capState.yUnit);
-
-  const selectedRes = filteredRes.filter((r) => capState.selectedResources === null || capState.selectedResources.has(r.id));
-  const resCount = selectedRes.length;
-
+function buildSingleChart(title, subtitle, resCount, buckets, yLabel) {
   const maxBuckets = 90;
   const visibleBuckets = buckets.slice(0, maxBuckets);
 
-  // maxY based on largest bucket
   let maxY = 0;
   visibleBuckets.forEach((b) => {
     const days = b.span || (capState.xUnit === "hours" ? 1/CAP_HOURS_PER_DAY : 1);
@@ -911,72 +907,52 @@ function renderCapChart(activeRes, filteredRes) {
     if (val > maxY) maxY = val;
   });
 
-  // Y axis ticks
-  const yTicks = 5;
+  const yTicks = 4;
   const yStep = maxY / yTicks;
   const yTicksArr = [];
   for (let i = yTicks; i >= 0; i--) yTicksArr.push(Math.round(yStep * i * 100) / 100);
 
-  // Build week separators (dashed line only, no month line)
   let prevWeek = null;
   const barHtmlParts = [];
-
   visibleBuckets.forEach((b) => {
     const isNewWeek = capState.xUnit === "days" && prevWeek !== null && b.weekYear !== prevWeek;
     prevWeek = b.weekYear;
-
     const separatorClass = isNewWeek ? "cap-week-sep" : "";
     const bucketDays = b.span || (capState.xUnit === "hours" ? 1/CAP_HOURS_PER_DAY : 1);
     const bucketY = getYValue(capState.yUnit) * bucketDays * resCount;
     const pct = maxY > 0 ? (bucketY / maxY) * 100 : 0;
-
     barHtmlParts.push(`
-      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${Math.round(bucketY * 100)/100}${yLabel}">
+      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${Math.round(bucketY*100)/100}${yLabel}">
         <div class="cap-bar" style="height:${pct}%"></div>
-        <div class="cap-bar-labels">
-          <span class="cap-bar-label">${b.label}</span>
-        </div>
+        <div class="cap-bar-labels"><span class="cap-bar-label">${b.label}</span></div>
       </div>`);
   });
 
-  // Week bands below chart
   const weekBands = [];
   if (capState.xUnit === "days" && visibleBuckets.length > 0) {
-    let runStart = 0;
-    let runWeek = visibleBuckets[0].weekYear;
+    let rs = 0, rw = visibleBuckets[0].weekYear;
     for (let i = 1; i <= visibleBuckets.length; i++) {
-      const cur = i < visibleBuckets.length ? visibleBuckets[i].weekYear : -1;
-      if (cur !== runWeek) {
-        weekBands.push({ span: i - runStart, label: `W${runWeek}` });
-        runStart = i;
-        runWeek = cur;
-      }
+      const c = i < visibleBuckets.length ? visibleBuckets[i].weekYear : -1;
+      if (c !== rw) { weekBands.push({ span: i - rs, label: `W${rw}` }); rs = i; rw = c; }
     }
   }
 
-  // Month bands below chart
   const monthBands = [];
   if (visibleBuckets.length > 0) {
-    let runStart = 0;
-    let runMonth = visibleBuckets[0].month;
+    let rs = 0, rm = visibleBuckets[0].month;
     for (let i = 1; i <= visibleBuckets.length; i++) {
-      const cur = i < visibleBuckets.length ? visibleBuckets[i].month : -1;
-      if (cur !== runMonth) {
-        const yr = visibleBuckets[runStart].date.getFullYear();
-        monthBands.push({ span: i - runStart, label: `${MONTH_NAMES[runMonth]} ${yr}` });
-        runStart = i;
-        runMonth = cur;
-      }
+      const c = i < visibleBuckets.length ? visibleBuckets[i].month : -1;
+      if (c !== rm) { const yr = visibleBuckets[rs].date.getFullYear(); monthBands.push({ span: i - rs, label: `${MONTH_NAMES[rm]} ${yr}` }); rs = i; rm = c; }
     }
   }
 
-  area.innerHTML = `
-    <div class="section-panel">
+  return `
+    <div class="section-panel cap-multi-panel">
       <div class="section-header">
-        <span class="section-title"><i data-lucide="bar-chart-3"></i> Available Capacity</span>
-        <span class="section-meta">${visibleBuckets.length} buckets · ${resCount} resource${resCount > 1 ? "s" : ""} · max ${Math.round(maxY*100)/100}${yLabel}/bucket</span>
+        <span class="section-title">${title}</span>
+        <span class="section-meta">${subtitle}</span>
       </div>
-      <div class="cap-chart">
+      <div class="cap-chart cap-chart-sm">
         <div class="cap-y-axis">
           ${yTicksArr.map((t) => `<div class="cap-y-tick"><span>${t}${yLabel}</span></div>`).join("")}
         </div>
@@ -984,26 +960,52 @@ function renderCapChart(activeRes, filteredRes) {
           <div class="cap-grid-lines">
             ${yTicksArr.map(() => `<div class="cap-grid-line"></div>`).join("")}
           </div>
-          <div class="cap-bars">
-            ${barHtmlParts.join("")}
-          </div>
+          <div class="cap-bars">${barHtmlParts.join("")}</div>
         </div>
       </div>
-      ${weekBands.length > 0 ? `
-        <div class="cap-week-bands">
-          <div class="cap-bands-spacer"></div>
-          ${weekBands.map((wb, i) => `<div class="cap-week-band ${i % 2 === 1 ? "alt" : ""}" style="flex:${wb.span}"><span>${wb.label}</span></div>`).join("")}
-        </div>
-      ` : ""}
-      ${monthBands.length > 0 ? `
-        <div class="cap-month-bands">
-          <div class="cap-bands-spacer"></div>
-          ${monthBands.map((mb, i) => `<div class="cap-month-band ${i % 2 === 1 ? "alt" : ""}" style="flex:${mb.span}"><span>${mb.label}</span></div>`).join("")}
-        </div>
-      ` : ""}
-    </div>
-  `;
+      ${weekBands.length > 0 ? `<div class="cap-week-bands"><div class="cap-bands-spacer"></div>${weekBands.map((wb, i) => `<div class="cap-week-band ${i%2===1?"alt":""}" style="flex:${wb.span}"><span>${wb.label}</span></div>`).join("")}</div>` : ""}
+      ${monthBands.length > 0 ? `<div class="cap-month-bands"><div class="cap-bands-spacer"></div>${monthBands.map((mb, i) => `<div class="cap-month-band ${i%2===1?"alt":""}" style="flex:${mb.span}"><span>${mb.label}</span></div>`).join("")}</div>` : ""}
+    </div>`;
+}
 
+function renderCapChart(activeRes, filteredRes) {
+  if (!filteredRes) filteredRes = activeRes;
+  const area = document.getElementById("cap-chart-area");
+  const startDate = new Date(capState.startDate + "T00:00:00");
+  const buckets = buildBuckets(startDate, capState.horizon, capState.xUnit);
+  const yLabel = getYLabel(capState.yUnit);
+
+  const selectedRes = filteredRes.filter((r) => capState.selectedResources === null || capState.selectedResources.has(r.id));
+
+  let html = "";
+
+  if (capState.viewBy === "group") {
+    const groups = [...new Set(selectedRes.map((r) => r.resource_group))];
+    groups.forEach((g) => {
+      const groupRes = selectedRes.filter((r) => r.resource_group === g);
+      html += buildSingleChart(
+        g,
+        `${groupRes.length} resource${groupRes.length > 1 ? "s" : ""} · ${groupRes.map((r) => r.short_desc).join(", ")}`,
+        groupRes.length, buckets, yLabel
+      );
+    });
+  } else if (capState.viewBy === "resource") {
+    selectedRes.forEach((r) => {
+      html += buildSingleChart(
+        r.short_desc,
+        `${r.code} · ${r.resource_group}`,
+        1, buckets, yLabel
+      );
+    });
+  } else {
+    html += buildSingleChart(
+      "All Selected Resources",
+      `${selectedRes.length} resource${selectedRes.length > 1 ? "s" : ""}`,
+      selectedRes.length, buckets, yLabel
+    );
+  }
+
+  area.innerHTML = `<div class="cap-charts-grid">${html}</div>`;
   safeIcons();
 }
 
@@ -1050,6 +1052,13 @@ function bindCapControls(body, activeRes) {
       } else {
         capState.horizon = parseInt(h);
       }
+      renderCapacity(body);
+    });
+  });
+
+  body.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      capState.viewBy = btn.dataset.view;
       renderCapacity(body);
     });
   });
