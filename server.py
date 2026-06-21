@@ -18,12 +18,20 @@ ROUTES = {
     "/api/customers": "SELECT * FROM customers ORDER BY id",
     "/api/material_groups": "SELECT * FROM material_groups ORDER BY id",
     "/api/materials": """
-        SELECT m.*, mg.name as group_name
+        SELECT m.id, m.description, m.unit, m.group_id, mg.name as group_name
         FROM materials m
         JOIN material_groups mg ON mg.id = m.group_id
         ORDER BY m.id
     """,
-    "/api/resources": "SELECT * FROM resources ORDER BY type, code",
+    "/api/resource_groups": "SELECT * FROM resource_groups ORDER BY id",
+    "/api/resources": """
+        SELECT res.id, res.code, res.description, res.short_desc,
+               res.group_id, rg.name as group_name,
+               res.capacity, res.location, res.status
+        FROM resources res
+        JOIN resource_groups rg ON rg.id = res.group_id
+        ORDER BY rg.name, res.code
+    """,
     "/api/routing": """
         SELECT r.id, r.material_group_id, mg.name as group_name,
                r.resource_id, res.code as resource_code, res.short_desc as resource_name,
@@ -36,8 +44,8 @@ ROUTES = {
     "/api/statuses": "SELECT * FROM sales_status ORDER BY id",
     "/api/sales": """
         SELECT sh.id, sh.customer_id, c.name as customer_name,
-               sh.status_id, ss.name as status, ss.description as status_desc,
-               sh.total_price
+               sh.status_id, ss.name as status,
+               COALESCE((SELECT SUM(total_price) FROM sales_items WHERE sales_header_id = sh.id), 0) as total_price
         FROM sales_header sh
         JOIN customers c ON c.id = sh.customer_id
         JOIN sales_status ss ON ss.id = sh.status_id
@@ -49,6 +57,28 @@ ROUTES = {
         FROM sales_items si
         JOIN materials m ON m.id = si.material_id
         ORDER BY si.sales_header_id, si.id
+    """,
+    "/api/production_orders": """
+        SELECT po.id, po.routing_id, po.sales_header_id, po.sales_item_id,
+               po.quantity, po.due_date,
+               r.time_per_unit, r.time_unit,
+               ROUND(r.time_per_unit * po.quantity, 1) as total_time,
+               ROUND(r.time_per_unit * po.quantity / 60.0, 2) as total_hours,
+               res.code as resource_code, res.short_desc as resource_name,
+               mg.name as material_group,
+               m.description as material,
+               c.name as customer,
+               ss.name as status
+        FROM production_orders po
+        JOIN routing r ON r.id = po.routing_id
+        JOIN resources res ON res.id = r.resource_id
+        JOIN material_groups mg ON mg.id = r.material_group_id
+        JOIN sales_items si ON si.id = po.sales_item_id
+        JOIN materials m ON m.id = si.material_id
+        JOIN sales_header sh ON sh.id = po.sales_header_id
+        JOIN customers c ON c.id = sh.customer_id
+        JOIN sales_status ss ON ss.id = sh.status_id
+        ORDER BY po.due_date, po.id
     """,
 }
 
@@ -62,134 +92,25 @@ MIME = {
 
 STATIC_FILES = ("index.html", "styles.css", "app.js")
 
-def compute_production_orders():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
-
-    rows = conn.execute("""
-        SELECT si.id as sales_item_id, si.sales_header_id, si.quantity, si.due_date,
-               m.group_id as material_group_id
-        FROM sales_items si
-        JOIN materials m ON m.id = si.material_id
-        JOIN sales_header sh ON sh.id = si.sales_header_id
-        JOIN sales_status ss ON ss.id = sh.status_id
-        WHERE si.due_date IS NOT NULL
-        ORDER BY si.due_date, si.id
-    """).fetchall()
-
-    routing_rows = conn.execute("""
-        SELECT r.id as routing_id, r.material_group_id, r.resource_id,
-               r.time_per_unit, r.time_unit,
-               mg.name as material_group,
-               res.code as resource_code, res.short_desc as resource_name
-        FROM routing r
-        JOIN material_groups mg ON mg.id = r.material_group_id
-        JOIN resources res ON res.id = r.resource_id
-    """).fetchall()
-
-    items_display = {r["sales_item_id"]: r for r in conn.execute("""
-        SELECT si.id as sales_item_id, si.sales_header_id,
-               m.description as material,
-               c.name as customer,
-               ss.name as status
-        FROM sales_items si
-        JOIN materials m ON m.id = si.material_id
-        JOIN sales_header sh ON sh.id = si.sales_header_id
-        JOIN customers c ON c.id = sh.customer_id
-        JOIN sales_status ss ON ss.id = sh.status_id
-    """).fetchall()}
-    conn.close()
-
-    routing_map = {}
-    routing_lookup = {}
-    for r in routing_rows:
-        rd = dict(r)
-        key = r["material_group_id"]
-        if key not in routing_map:
-            routing_map[key] = []
-        routing_map[key].append(rd)
-        routing_lookup[r["routing_id"]] = rd
-
-    orders = []
-    po_id = 0
-    for item in rows:
-        routes = routing_map.get(item["material_group_id"], [])
-        disp = items_display.get(item["sales_item_id"], {})
-        for rt in routes:
-            po_id += 1
-            total_time = rt["time_per_unit"] * item["quantity"]
-            orders.append({
-                "po_id": po_id,
-                "routing_id": rt["routing_id"],
-                "sales_header_id": item["sales_header_id"],
-                "sales_item_id": item["sales_item_id"],
-                "quantity": item["quantity"],
-                "total_time": round(total_time, 1),
-                "total_hours": round(total_time / 60, 2),
-                "due_date": item["due_date"],
-                "customer": disp.get("customer", ""),
-                "status": disp.get("status", ""),
-                "material": disp.get("material", ""),
-                "material_group": rt["material_group"],
-                "resource_code": rt["resource_code"],
-                "resource_name": rt["resource_name"],
-                "time_per_unit": rt["time_per_unit"],
-                "time_unit": rt["time_unit"],
-            })
-    return orders
-
 def compute_load():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
-
-    rows = conn.execute("""
-        SELECT si.id, si.quantity, si.due_date,
-               m.group_id as material_group_id
-        FROM sales_items si
-        JOIN materials m ON m.id = si.material_id
-        JOIN sales_header sh ON sh.id = si.sales_header_id
+    rows = query("""
+        SELECT po.due_date, r.resource_id,
+               SUM(r.time_per_unit * po.quantity / 60.0) as hours
+        FROM production_orders po
+        JOIN routing r ON r.id = po.routing_id
+        JOIN sales_header sh ON sh.id = po.sales_header_id
         JOIN sales_status ss ON ss.id = sh.status_id
-        WHERE si.due_date IS NOT NULL
+        WHERE po.due_date IS NOT NULL
           AND ss.name NOT IN ('closed', 'cancelled', 'delivered')
-    """).fetchall()
-
-    routing_rows = conn.execute("""
-        SELECT material_group_id, resource_id, time_per_unit, time_unit
-        FROM routing
-    """).fetchall()
-    conn.close()
-
-    routing_map = {}
-    for r in routing_rows:
-        key = r["material_group_id"]
-        if key not in routing_map:
-            routing_map[key] = []
-        routing_map[key].append(dict(r))
-
-    load = {}
-    for item in rows:
-        due = item["due_date"]
-        mg = item["material_group_id"]
-        qty = item["quantity"]
-        routes = routing_map.get(mg, [])
-        for rt in routes:
-            rid = rt["resource_id"]
-            minutes = rt["time_per_unit"] * qty
-            hours = minutes / 60.0
-            k = f"{due}_{rid}"
-            if k not in load:
-                load[k] = {"date": due, "resource_id": rid, "hours": 0}
-            load[k]["hours"] += hours
-
-    return list(load.values())
+        GROUP BY po.due_date, r.resource_id
+    """)
+    return rows
 
 # ── WSGI app for gunicorn ──
 
 def handle_special(path):
     if path == "/api/load":
         return compute_load()
-    if path == "/api/production_orders":
-        return compute_production_orders()
     return None
 
 def app(environ, start_response):

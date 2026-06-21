@@ -393,12 +393,6 @@ function statusTag(status) {
   return `<span class="tag ${s.cls}"><i data-lucide="${s.icon}"></i> ${status}</span>`;
 }
 
-const RESOURCE_TYPE_STYLE = {
-  calandra:      { cls: "tag-teal",   icon: "circle-dot" },
-  prensa:        { cls: "tag-violet", icon: "arrow-down-to-line" },
-  montadora:     { cls: "tag-amber",  icon: "layers" },
-};
-
 const RESOURCE_STATUS_STYLE = {
   active:      { cls: "tag-green",  icon: "check-circle" },
   maintenance: { cls: "tag-amber",  icon: "wrench" },
@@ -605,7 +599,7 @@ async function renderProdOrders(body) {
     tableName: "production_orders",
     data,
     columns: [
-      { key: "po_id", label: "PO #", render: (v) => `<span class="mono"><strong>${v}</strong></span>`, rawValue: (v) => v },
+      { key: "id", label: "PO #", render: (v) => `<span class="mono"><strong>${v}</strong></span>`, rawValue: (v) => v },
       { key: "routing_id", label: "Routing FK", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "sales_header_id", label: "SO FK", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "sales_item_id", label: "Item FK", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
@@ -731,12 +725,8 @@ async function renderResources(body) {
       { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "code", label: "Code", render: (v) => `<span class="mono"><strong>${v}</strong></span>` },
       { key: "short_desc", label: "Short Desc" },
-      { key: "resource_group", label: "Group", render: (v) => `<span class="tag tag-muted">${v}</span>` },
+      { key: "group_name", label: "Group", render: (v) => `<span class="tag tag-muted">${v}</span>` },
       { key: "description", label: "Description" },
-      { key: "type", label: "Type", render: (v) => {
-        const ts = RESOURCE_TYPE_STYLE[v] || { cls: "tag-muted", icon: "circle" };
-        return `<span class="tag ${ts.cls}"><i data-lucide="${ts.icon}"></i> ${v}</span>`;
-      }},
       { key: "capacity", label: "Capacity", render: (v) => v || "—" },
       { key: "location", label: "Location", render: (v) => v || "—" },
       { key: "status", label: "Status", render: (v) => {
@@ -855,7 +845,7 @@ async function renderCapacity(body) {
   const resources = await api("/api/resources");
   const activeRes = resources.filter((r) => r.status === "active");
 
-  const filteredRes = activeRes.filter((r) => capState.selectedGroups === null || capState.selectedGroups.has(r.resource_group));
+  const filteredRes = activeRes.filter((r) => capState.selectedGroups === null || capState.selectedGroups.has(r.group_name));
 
   body.innerHTML = `
     <div class="cap-controls">
@@ -946,7 +936,7 @@ async function renderCapacity(body) {
       <div class="cap-control-group">
         <label class="cap-label">Group</label>
         <div class="cap-resource-toggles" id="capGroupToggles">
-          ${[...new Set(activeRes.map((r) => r.resource_group))].map((g) => {
+          ${[...new Set(activeRes.map((r) => r.group_name))].map((g) => {
             const on = capState.selectedGroups === null || capState.selectedGroups.has(g);
             return `<label class="cap-resource-toggle ${on ? "on" : ""}" data-group="${g}"><input type="checkbox" ${on ? "checked" : ""} data-group="${g}" /><span class="cap-toggle-code">${g}</span></label>`;
           }).join("")}
@@ -1096,16 +1086,17 @@ async function renderCapChart(activeRes, filteredRes) {
   const loadRaw = await api("/api/load");
   const loadMap = {};
   loadRaw.forEach((l) => {
-    if (!loadMap[l.date]) loadMap[l.date] = {};
-    loadMap[l.date][l.resource_id] = (loadMap[l.date][l.resource_id] || 0) + l.hours;
+    const d = l.due_date || l.date;
+    if (!loadMap[d]) loadMap[d] = {};
+    loadMap[d][l.resource_id] = (loadMap[d][l.resource_id] || 0) + l.hours;
   });
 
   let html = "";
 
   if (capState.viewBy === "group") {
-    const groups = [...new Set(selectedRes.map((r) => r.resource_group))];
+    const groups = [...new Set(selectedRes.map((r) => r.group_name))];
     groups.forEach((g) => {
-      const groupRes = selectedRes.filter((r) => r.resource_group === g);
+      const groupRes = selectedRes.filter((r) => r.group_name === g);
       const rids = groupRes.map((r) => r.id);
       html += buildSingleChart(g,
         `${groupRes.length} resource${groupRes.length > 1 ? "s" : ""} · ${groupRes.map((r) => r.short_desc).join(", ")}`,
@@ -1113,7 +1104,7 @@ async function renderCapChart(activeRes, filteredRes) {
     });
   } else if (capState.viewBy === "resource") {
     selectedRes.forEach((r) => {
-      html += buildSingleChart(r.short_desc, `${r.code} · ${r.resource_group}`,
+      html += buildSingleChart(r.short_desc, `${r.code} · ${r.group_name}`,
         1, buckets, yLabel, [r.id], loadMap);
     });
   } else {
@@ -1201,7 +1192,7 @@ function bindCapControls(body, activeRes) {
   document.querySelectorAll("#capGroupToggles input[type=checkbox]").forEach((cb) => {
     cb.addEventListener("change", () => {
       const grp = cb.dataset.group;
-      const allGroups = [...new Set(activeRes.map((r) => r.resource_group))];
+      const allGroups = [...new Set(activeRes.map((r) => r.group_name))];
       if (capState.selectedGroups === null) {
         capState.selectedGroups = new Set(allGroups);
       }
@@ -1222,7 +1213,7 @@ function bindCapControls(body, activeRes) {
   document.querySelectorAll("#capResourceToggles input[type=checkbox]").forEach((cb) => {
     cb.addEventListener("change", () => {
       const id = parseInt(cb.dataset.id);
-      const filteredRes = activeRes.filter((r) => capState.selectedGroups === null || capState.selectedGroups.has(r.resource_group));
+      const filteredRes = activeRes.filter((r) => capState.selectedGroups === null || capState.selectedGroups.has(r.group_name));
       if (capState.selectedResources === null) {
         capState.selectedResources = new Set(filteredRes.map((r) => r.id));
       }

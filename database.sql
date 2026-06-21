@@ -1,3 +1,7 @@
+-- =============================================
+-- Manufacturing.AI — Schema (3NF)
+-- =============================================
+
 CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -16,8 +20,13 @@ CREATE TABLE IF NOT EXISTS materials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     description TEXT NOT NULL,
     unit TEXT DEFAULT 'UN',
-    group_id INTEGER NOT NULL DEFAULT 1,
+    group_id INTEGER NOT NULL,
     FOREIGN KEY (group_id) REFERENCES material_groups(id)
+);
+
+CREATE TABLE IF NOT EXISTS resource_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS resources (
@@ -25,11 +34,11 @@ CREATE TABLE IF NOT EXISTS resources (
     code TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL,
     short_desc TEXT NOT NULL,
-    resource_group TEXT NOT NULL,
-    type TEXT NOT NULL,
+    group_id INTEGER NOT NULL,
     capacity TEXT,
     location TEXT,
-    status TEXT DEFAULT 'active'
+    status TEXT DEFAULT 'active',
+    FOREIGN KEY (group_id) REFERENCES resource_groups(id)
 );
 
 CREATE TABLE IF NOT EXISTS routing (
@@ -53,7 +62,6 @@ CREATE TABLE IF NOT EXISTS sales_header (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id INTEGER NOT NULL,
     status_id INTEGER NOT NULL DEFAULT 1,
-    total_price REAL DEFAULT 0,
     FOREIGN KEY (customer_id) REFERENCES customers(id),
     FOREIGN KEY (status_id) REFERENCES sales_status(id)
 );
@@ -68,4 +76,16 @@ CREATE TABLE IF NOT EXISTS sales_items (
     due_date TEXT,
     FOREIGN KEY (sales_header_id) REFERENCES sales_header(id),
     FOREIGN KEY (material_id) REFERENCES materials(id)
+);
+
+CREATE TABLE IF NOT EXISTS production_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    routing_id INTEGER NOT NULL,
+    sales_header_id INTEGER NOT NULL,
+    sales_item_id INTEGER NOT NULL,
+    quantity REAL NOT NULL,
+    due_date TEXT,
+    FOREIGN KEY (routing_id) REFERENCES routing(id),
+    FOREIGN KEY (sales_header_id) REFERENCES sales_header(id),
+    FOREIGN KEY (sales_item_id) REFERENCES sales_items(id)
 );
