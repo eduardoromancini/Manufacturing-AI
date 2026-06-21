@@ -896,7 +896,37 @@ async function renderCapacity(body) {
   safeIcons();
 }
 
-function buildSingleChart(title, subtitle, resCount, buckets, yLabel) {
+// loadMap: { "YYYY-MM-DD": { resourceId: hours, ... } }
+function getLoadForBucket(b, resourceIds, loadMap, yUnit) {
+  let totalHours = 0;
+  if (capState.xUnit === "hours") {
+    const dateStr = `${b.date.getFullYear()}-${String(b.date.getMonth()+1).padStart(2,"0")}-${String(b.date.getDate()).padStart(2,"0")}`;
+    resourceIds.forEach((rid) => {
+      totalHours += (loadMap[dateStr]?.[rid] || 0) / CAP_HOURS_PER_DAY;
+    });
+  } else if (capState.xUnit === "days") {
+    const dateStr = `${b.date.getFullYear()}-${String(b.date.getMonth()+1).padStart(2,"0")}-${String(b.date.getDate()).padStart(2,"0")}`;
+    resourceIds.forEach((rid) => {
+      totalHours += (loadMap[dateStr]?.[rid] || 0);
+    });
+  } else {
+    const spanDays = b.span || 7;
+    for (let d = 0; d < spanDays; d++) {
+      const dd = addDays(b.date, d);
+      const dateStr = `${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,"0")}-${String(dd.getDate()).padStart(2,"0")}`;
+      resourceIds.forEach((rid) => {
+        totalHours += (loadMap[dateStr]?.[rid] || 0);
+      });
+    }
+  }
+  if (yUnit === "hours") return totalHours;
+  if (yUnit === "days") return totalHours / CAP_HOURS_PER_DAY;
+  if (yUnit === "minutes") return totalHours * 60;
+  if (yUnit === "shifts") return totalHours / 8;
+  return totalHours;
+}
+
+function buildSingleChart(title, subtitle, resCount, buckets, yLabel, resourceIds, loadMap) {
   const maxBuckets = 90;
   const visibleBuckets = buckets.slice(0, maxBuckets);
 
@@ -919,11 +949,21 @@ function buildSingleChart(title, subtitle, resCount, buckets, yLabel) {
     prevWeek = b.weekYear;
     const separatorClass = isNewWeek ? "cap-week-sep" : "";
     const bucketDays = b.span || (capState.xUnit === "hours" ? 1/CAP_HOURS_PER_DAY : 1);
-    const bucketY = getYValue(capState.yUnit) * bucketDays * resCount;
-    const pct = maxY > 0 ? (bucketY / maxY) * 100 : 0;
+    const capacity = getYValue(capState.yUnit) * bucketDays * resCount;
+    const consumed = loadMap ? getLoadForBucket(b, resourceIds, loadMap, capState.yUnit) : 0;
+    const available = Math.max(0, capacity - consumed);
+    const consumedPct = maxY > 0 ? (consumed / maxY) * 100 : 0;
+    const availPct = maxY > 0 ? (available / maxY) * 100 : 0;
+    const overloaded = consumed > capacity;
+    const consumedRound = Math.round(consumed * 10) / 10;
+    const availRound = Math.round(available * 10) / 10;
+
     barHtmlParts.push(`
-      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${Math.round(bucketY*100)/100}${yLabel}">
-        <div class="cap-bar" style="height:${pct}%"></div>
+      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${availRound}${yLabel} available / ${consumedRound}${yLabel} consumed">
+        <div class="cap-bar-stack" style="height:${Math.min(consumedPct + availPct, 100)}%">
+          <div class="cap-bar-avail" style="flex:${availPct}"></div>
+          <div class="cap-bar-consumed ${overloaded ? "cap-bar-over" : ""}" style="flex:${consumedPct}"></div>
+        </div>
         <div class="cap-bar-labels"><span class="cap-bar-label">${b.label}</span></div>
       </div>`);
   });
@@ -968,7 +1008,7 @@ function buildSingleChart(title, subtitle, resCount, buckets, yLabel) {
     </div>`;
 }
 
-function renderCapChart(activeRes, filteredRes) {
+async function renderCapChart(activeRes, filteredRes) {
   if (!filteredRes) filteredRes = activeRes;
   const area = document.getElementById("cap-chart-area");
   const startDate = new Date(capState.startDate + "T00:00:00");
@@ -977,35 +1017,44 @@ function renderCapChart(activeRes, filteredRes) {
 
   const selectedRes = filteredRes.filter((r) => capState.selectedResources === null || capState.selectedResources.has(r.id));
 
+  // Fetch load data and build map: { "YYYY-MM-DD": { resourceId: hours } }
+  const loadRaw = await api("/api/load");
+  const loadMap = {};
+  loadRaw.forEach((l) => {
+    if (!loadMap[l.date]) loadMap[l.date] = {};
+    loadMap[l.date][l.resource_id] = (loadMap[l.date][l.resource_id] || 0) + l.hours;
+  });
+
   let html = "";
 
   if (capState.viewBy === "group") {
     const groups = [...new Set(selectedRes.map((r) => r.resource_group))];
     groups.forEach((g) => {
       const groupRes = selectedRes.filter((r) => r.resource_group === g);
-      html += buildSingleChart(
-        g,
+      const rids = groupRes.map((r) => r.id);
+      html += buildSingleChart(g,
         `${groupRes.length} resource${groupRes.length > 1 ? "s" : ""} · ${groupRes.map((r) => r.short_desc).join(", ")}`,
-        groupRes.length, buckets, yLabel
-      );
+        groupRes.length, buckets, yLabel, rids, loadMap);
     });
   } else if (capState.viewBy === "resource") {
     selectedRes.forEach((r) => {
-      html += buildSingleChart(
-        r.short_desc,
-        `${r.code} · ${r.resource_group}`,
-        1, buckets, yLabel
-      );
+      html += buildSingleChart(r.short_desc, `${r.code} · ${r.resource_group}`,
+        1, buckets, yLabel, [r.id], loadMap);
     });
   } else {
-    html += buildSingleChart(
-      "All Selected Resources",
+    const rids = selectedRes.map((r) => r.id);
+    html += buildSingleChart("All Selected Resources",
       `${selectedRes.length} resource${selectedRes.length > 1 ? "s" : ""}`,
-      selectedRes.length, buckets, yLabel
-    );
+      selectedRes.length, buckets, yLabel, rids, loadMap);
   }
 
-  area.innerHTML = `<div class="cap-charts-grid">${html}</div>`;
+  area.innerHTML = `
+    <div class="cap-legend">
+      <span class="cap-legend-item"><span class="cap-legend-dot cap-legend-avail"></span> Available</span>
+      <span class="cap-legend-item"><span class="cap-legend-dot cap-legend-consumed"></span> Consumed</span>
+      <span class="cap-legend-item"><span class="cap-legend-dot cap-legend-over"></span> Overloaded</span>
+    </div>
+    <div class="cap-charts-grid">${html}</div>`;
   safeIcons();
 }
 

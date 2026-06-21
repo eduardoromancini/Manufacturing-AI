@@ -62,10 +62,70 @@ MIME = {
 
 STATIC_FILES = ("index.html", "styles.css", "app.js")
 
+def compute_load():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+
+    rows = conn.execute("""
+        SELECT si.id, si.quantity, si.due_date,
+               m.group_id as material_group_id
+        FROM sales_items si
+        JOIN materials m ON m.id = si.material_id
+        JOIN sales_header sh ON sh.id = si.sales_header_id
+        JOIN sales_status ss ON ss.id = sh.status_id
+        WHERE si.due_date IS NOT NULL
+          AND ss.name NOT IN ('closed', 'cancelled', 'delivered')
+    """).fetchall()
+
+    routing_rows = conn.execute("""
+        SELECT material_group_id, resource_id, time_per_unit, time_unit
+        FROM routing
+    """).fetchall()
+    conn.close()
+
+    routing_map = {}
+    for r in routing_rows:
+        key = r["material_group_id"]
+        if key not in routing_map:
+            routing_map[key] = []
+        routing_map[key].append(dict(r))
+
+    load = {}
+    for item in rows:
+        due = item["due_date"]
+        mg = item["material_group_id"]
+        qty = item["quantity"]
+        routes = routing_map.get(mg, [])
+        for rt in routes:
+            rid = rt["resource_id"]
+            minutes = rt["time_per_unit"] * qty
+            hours = minutes / 60.0
+            k = f"{due}_{rid}"
+            if k not in load:
+                load[k] = {"date": due, "resource_id": rid, "hours": 0}
+            load[k]["hours"] += hours
+
+    return list(load.values())
+
 # ── WSGI app for gunicorn ──
+
+def handle_special(path):
+    if path == "/api/load":
+        return compute_load()
+    return None
 
 def app(environ, start_response):
     path = environ.get("PATH_INFO", "/").split("?")[0]
+
+    special = handle_special(path)
+    if special is not None:
+        data = json.dumps(special).encode()
+        start_response("200 OK", [
+            ("Content-Type", "application/json"),
+            ("Cache-Control", "no-cache"),
+            ("Content-Length", str(len(data))),
+        ])
+        return [data]
 
     if path in ROUTES:
         data = json.dumps(query(ROUTES[path])).encode()
@@ -100,6 +160,15 @@ def app(environ, start_response):
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
+
+        special = handle_special(path)
+        if special is not None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(json.dumps(special).encode())
+            return
 
         if path in ROUTES:
             data = query(ROUTES[path])

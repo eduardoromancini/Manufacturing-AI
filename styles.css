@@ -1038,17 +1038,70 @@
   gap: 6px;
 }
 
-.cap-bar {
+.cap-bar-stack {
   width: 100%;
-  background: var(--teal);
+  display: flex;
+  flex-direction: column;
   border-radius: 4px 4px 0 0;
+  overflow: hidden;
   min-height: 2px;
-  transition: height 0.3s ease;
-  opacity: 0.85;
 }
 
-.cap-bar:hover {
+.cap-bar-avail {
+  background: var(--teal);
+  opacity: 0.75;
+  min-height: 0;
+}
+
+.cap-bar-consumed {
+  background: var(--amber);
+  opacity: 0.85;
+  min-height: 0;
+}
+
+.cap-bar-over {
+  background: var(--coral);
+}
+
+.cap-bar-col:hover .cap-bar-avail {
   opacity: 1;
+}
+
+.cap-bar-col:hover .cap-bar-consumed {
+  opacity: 1;
+}
+
+.cap-legend {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.cap-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cap-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.cap-legend-avail {
+  background: var(--teal);
+}
+
+.cap-legend-consumed {
+  background: var(--amber);
+}
+
+.cap-legend-over {
+  background: var(--coral);
 }
 
 .cap-bar-labels {
