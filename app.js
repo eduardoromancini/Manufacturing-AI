@@ -38,14 +38,14 @@ async function loadSection(name) {
   const count = document.getElementById("stageCount");
   const timer = document.getElementById("loadTime");
 
-  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", routing: "Routing", capacity: "Capacity", statuses: "Status" };
+  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", routing: "Routing", prod_orders: "Production Orders", capacity: "Capacity", statuses: "Status" };
   count.textContent = labels[name] || name;
   body.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Loading...</div>';
   safeIcons();
 
   const t0 = performance.now();
   try {
-    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, routing: renderRouting, capacity: renderCapacity, statuses: renderStatuses };
+    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, routing: renderRouting, prod_orders: renderProdOrders, capacity: renderCapacity, statuses: renderStatuses };
     if (renderers[name]) await renderers[name](body);
   } catch (err) {
     body.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${err.message}</p></div>`;
@@ -565,6 +565,62 @@ async function renderMaterialGroups(body) {
       { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "name", label: "Group", render: (v) => `<strong>${v}</strong>` },
       { key: "description", label: "Description", render: (v) => v || "—" },
+    ],
+  });
+}
+
+async function renderProdOrders(body) {
+  const data = await api("/api/production_orders");
+  const today = new Date().toISOString().slice(0, 10);
+
+  const totalHours = data.reduce((a, r) => a + r.total_hours, 0);
+  const activeOrders = data.filter((r) => r.status !== "closed" && r.status !== "cancelled" && r.status !== "delivered");
+  const overdueOrders = activeOrders.filter((r) => r.due_date < today);
+
+  body.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span class="kpi-label"><i data-lucide="clipboard-list"></i> Production Orders</span>
+        <span class="kpi-value">${data.length}</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label"><i data-lucide="clock"></i> Total Load</span>
+        <span class="kpi-value">${Math.round(totalHours).toLocaleString("pt-BR")}h</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label"><i data-lucide="loader-2"></i> Active</span>
+        <span class="kpi-value">${activeOrders.length}</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label"><i data-lucide="alert-triangle"></i> Overdue</span>
+        <span class="kpi-value">${overdueOrders.length}</span>
+        ${overdueOrders.length > 0 ? '<span class="kpi-change down">Needs attention</span>' : '<span class="kpi-change up">All on track</span>'}
+      </div>
+    </div>
+    <div id="prod-orders-table"></div>
+  `;
+  safeIcons();
+
+  DataTable(document.getElementById("prod-orders-table"), {
+    tableName: "production_orders",
+    data,
+    columns: [
+      { key: "po_id", label: "PO #", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "sales_order", label: "SO #", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "customer", label: "Customer", render: (v) => `<strong>${v}</strong>` },
+      { key: "status", label: "Status", render: (v) => statusTag(v) },
+      { key: "material_group", label: "Mat. Group", render: (v) => `<span class="tag tag-muted">${v}</span>` },
+      { key: "resource_code", label: "Resource", render: (v, row) => `<span class="mono"><strong>${v}</strong></span>` },
+      { key: "resource_name", label: "Resource Name" },
+      { key: "quantity", label: "Qty", numeric: true, render: (v) => v.toLocaleString("pt-BR"), rawValue: (v) => v },
+      { key: "time_per_unit", label: "Time/Unit", numeric: true, render: (v, row) => `${v} ${row.time_unit}`, rawValue: (v) => v },
+      { key: "total_time", label: "Total Time", numeric: true, render: (v, row) => `${v.toLocaleString("pt-BR")} min`, rawValue: (v) => v },
+      { key: "total_hours", label: "Total Hours", numeric: true, render: (v) => `${v.toLocaleString("pt-BR")}h`, rawValue: (v) => v },
+      { key: "due_date", label: "Due Date", render: (v) => {
+        if (!v) return "—";
+        const isOverdue = v < today;
+        return `<span class="tag ${isOverdue ? "tag-coral" : "tag-teal"}">${v}</span>`;
+      }},
     ],
   });
 }

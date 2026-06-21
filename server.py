@@ -62,6 +62,67 @@ MIME = {
 
 STATIC_FILES = ("index.html", "styles.css", "app.js")
 
+def compute_production_orders():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+
+    rows = conn.execute("""
+        SELECT si.id as sales_item_id, si.sales_header_id, si.quantity, si.due_date,
+               m.id as material_id, m.description as material, m.group_id as material_group_id,
+               mg.name as material_group,
+               c.name as customer,
+               ss.name as status
+        FROM sales_items si
+        JOIN materials m ON m.id = si.material_id
+        JOIN material_groups mg ON mg.id = m.group_id
+        JOIN sales_header sh ON sh.id = si.sales_header_id
+        JOIN customers c ON c.id = sh.customer_id
+        JOIN sales_status ss ON ss.id = sh.status_id
+        WHERE si.due_date IS NOT NULL
+        ORDER BY si.due_date, si.id
+    """).fetchall()
+
+    routing_rows = conn.execute("""
+        SELECT r.material_group_id, r.resource_id, r.time_per_unit, r.time_unit,
+               res.code as resource_code, res.short_desc as resource_name
+        FROM routing r
+        JOIN resources res ON res.id = r.resource_id
+    """).fetchall()
+    conn.close()
+
+    routing_map = {}
+    for r in routing_rows:
+        key = r["material_group_id"]
+        if key not in routing_map:
+            routing_map[key] = []
+        routing_map[key].append(dict(r))
+
+    orders = []
+    po_id = 0
+    for item in rows:
+        routes = routing_map.get(item["material_group_id"], [])
+        for rt in routes:
+            po_id += 1
+            total_time = rt["time_per_unit"] * item["quantity"]
+            orders.append({
+                "po_id": po_id,
+                "sales_item_id": item["sales_item_id"],
+                "sales_order": item["sales_header_id"],
+                "customer": item["customer"],
+                "status": item["status"],
+                "material": item["material"],
+                "material_group": item["material_group"],
+                "quantity": item["quantity"],
+                "resource_code": rt["resource_code"],
+                "resource_name": rt["resource_name"],
+                "time_per_unit": rt["time_per_unit"],
+                "time_unit": rt["time_unit"],
+                "total_time": round(total_time, 1),
+                "total_hours": round(total_time / 60, 2),
+                "due_date": item["due_date"],
+            })
+    return orders
+
 def compute_load():
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
@@ -112,6 +173,8 @@ def compute_load():
 def handle_special(path):
     if path == "/api/load":
         return compute_load()
+    if path == "/api/production_orders":
+        return compute_production_orders()
     return None
 
 def app(environ, start_response):
