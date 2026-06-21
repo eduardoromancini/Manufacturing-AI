@@ -1352,10 +1352,10 @@ async function renderLearningHome(body) {
 // ════════════════════════════════════════════════════════════════
 
 const FS_JOBS = [
-  { id: "J1", color: "#0f766e", release: 0, tasks: [{ m: 0, d: 3 }, { m: 1, d: 4 }, { m: 2, d: 2 }] },
-  { id: "J2", color: "#5b5bd6", release: 2, tasks: [{ m: 0, d: 5 }, { m: 1, d: 3 }, { m: 2, d: 7 }] },
-  { id: "J3", color: "#c84622", release: 7, tasks: [{ m: 0, d: 2 }, { m: 1, d: 1 }, { m: 2, d: 4 }] },
-  { id: "J4", color: "#b7791f", release: 9, tasks: [{ m: 0, d: 1 }, { m: 1, d: 6 }, { m: 2, d: 5 }] },
+  { id: "J1", color: "#0f766e", release: 0, tasks: [{ m: 0, d: 2 }, { m: 1, d: 5 }, { m: 2, d: 6 }] },
+  { id: "J2", color: "#5b5bd6", release: 9, tasks: [{ m: 0, d: 1 }, { m: 1, d: 5 }, { m: 2, d: 7 }] },
+  { id: "J3", color: "#c84622", release: 2, tasks: [{ m: 0, d: 1 }, { m: 1, d: 4 }, { m: 2, d: 1 }] },
+  { id: "J4", color: "#b7791f", release: 7, tasks: [{ m: 0, d: 3 }, { m: 1, d: 4 }, { m: 2, d: 7 }] },
 ];
 const FS_MACHINES = ["M1", "M2", "M3"];
 
