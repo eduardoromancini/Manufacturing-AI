@@ -38,14 +38,14 @@ async function loadSection(name) {
   const count = document.getElementById("stageCount");
   const timer = document.getElementById("loadTime");
 
-  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", resources: "Resources", statuses: "Status" };
+  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", resources: "Resources", capacity: "Capacity", statuses: "Status" };
   count.textContent = labels[name] || name;
   body.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Loading...</div>';
   safeIcons();
 
   const t0 = performance.now();
   try {
-    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, resources: renderResources, statuses: renderStatuses };
+    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, resources: renderResources, capacity: renderCapacity, statuses: renderStatuses };
     if (renderers[name]) await renderers[name](body);
   } catch (err) {
     body.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${err.message}</p></div>`;
@@ -615,6 +615,214 @@ async function renderResources(body) {
     ],
   });
 }
+
+// ── Capacity ──
+
+const CAP_HOURS_PER_DAY = 24;
+
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function fmtDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDateShort(d) {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
+}
+
+function buildBuckets(startDate, horizonDays, xUnit) {
+  const buckets = [];
+  const start = new Date(startDate);
+
+  if (xUnit === "hours") {
+    for (let h = 0; h < horizonDays * CAP_HOURS_PER_DAY; h++) {
+      const d = new Date(start);
+      d.setHours(d.getHours() + h);
+      const hh = String(d.getHours()).padStart(2, "0");
+      buckets.push({ label: `${fmtDateShort(d)} ${hh}h`, date: d });
+    }
+  } else if (xUnit === "days") {
+    for (let i = 0; i < horizonDays; i++) {
+      const d = addDays(start, i);
+      buckets.push({ label: fmtDateShort(d), date: d });
+    }
+  } else if (xUnit === "weeks") {
+    const weeks = Math.ceil(horizonDays / 7);
+    for (let i = 0; i < weeks; i++) {
+      const d = addDays(start, i * 7);
+      const end = addDays(d, 6);
+      buckets.push({ label: `${fmtDateShort(d)}–${fmtDateShort(end)}`, date: d, span: 7 });
+    }
+  } else if (xUnit === "months") {
+    const months = Math.ceil(horizonDays / 30);
+    for (let i = 0; i < months; i++) {
+      const d = new Date(start);
+      d.setMonth(d.getMonth() + i);
+      const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      buckets.push({ label: `${names[d.getMonth()]} ${d.getFullYear()}`, date: d, span: 30 });
+    }
+  }
+  return buckets;
+}
+
+function getYValue(yUnit) {
+  if (yUnit === "hours") return CAP_HOURS_PER_DAY;
+  if (yUnit === "minutes") return CAP_HOURS_PER_DAY * 60;
+  if (yUnit === "shifts") return 3;
+  return CAP_HOURS_PER_DAY;
+}
+
+function getYPerBucket(yUnit, xUnit) {
+  const perDay = getYValue(yUnit);
+  if (xUnit === "hours") return perDay / CAP_HOURS_PER_DAY;
+  if (xUnit === "days") return perDay;
+  if (xUnit === "weeks") return perDay * 7;
+  if (xUnit === "months") return perDay * 30;
+  return perDay;
+}
+
+function getYLabel(yUnit) {
+  if (yUnit === "hours") return "h";
+  if (yUnit === "minutes") return "min";
+  if (yUnit === "shifts") return "shifts";
+  return "h";
+}
+
+let capState = { horizon: 7, xUnit: "days", yUnit: "hours", resource: "all" };
+
+async function renderCapacity(body) {
+  const resources = await api("/api/resources");
+  const activeRes = resources.filter((r) => r.status === "active");
+
+  body.innerHTML = `
+    <div class="cap-controls">
+      <div class="cap-control-group">
+        <label class="cap-label">Horizon</label>
+        <div class="cap-horizon-btns">
+          <button class="cap-btn ${capState.horizon === 1 ? "active" : ""}" data-h="1">1 day</button>
+          <button class="cap-btn ${capState.horizon === 7 ? "active" : ""}" data-h="7">7 days</button>
+          <button class="cap-btn ${capState.horizon === 14 ? "active" : ""}" data-h="14">14 days</button>
+          <button class="cap-btn ${capState.horizon === 30 ? "active" : ""}" data-h="30">30 days</button>
+          <button class="cap-btn ${capState.horizon === 90 ? "active" : ""}" data-h="90">90 days</button>
+        </div>
+      </div>
+      <div class="cap-control-group">
+        <label class="cap-label">X Axis</label>
+        <select class="cap-select" id="capXUnit">
+          <option value="hours" ${capState.xUnit === "hours" ? "selected" : ""}>Hours</option>
+          <option value="days" ${capState.xUnit === "days" ? "selected" : ""}>Days</option>
+          <option value="weeks" ${capState.xUnit === "weeks" ? "selected" : ""}>Weeks</option>
+          <option value="months" ${capState.xUnit === "months" ? "selected" : ""}>Months</option>
+        </select>
+      </div>
+      <div class="cap-control-group">
+        <label class="cap-label">Y Axis</label>
+        <select class="cap-select" id="capYUnit">
+          <option value="hours" ${capState.yUnit === "hours" ? "selected" : ""}>Hours</option>
+          <option value="minutes" ${capState.yUnit === "minutes" ? "selected" : ""}>Minutes</option>
+          <option value="shifts" ${capState.yUnit === "shifts" ? "selected" : ""}>Shifts (8h)</option>
+        </select>
+      </div>
+      <div class="cap-control-group">
+        <label class="cap-label">Resource</label>
+        <select class="cap-select" id="capResource">
+          <option value="all" ${capState.resource === "all" ? "selected" : ""}>All resources (${activeRes.length})</option>
+          ${activeRes.map((r) => `<option value="${r.id}" ${capState.resource == r.id ? "selected" : ""}>${r.code} — ${r.description}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div id="cap-chart-area"></div>
+  `;
+
+  renderCapChart(activeRes);
+  bindCapControls(body, activeRes);
+  safeIcons();
+}
+
+function renderCapChart(activeRes) {
+  const area = document.getElementById("cap-chart-area");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const buckets = buildBuckets(today, capState.horizon, capState.xUnit);
+  const yPerBucket = getYPerBucket(capState.yUnit, capState.xUnit);
+  const yLabel = getYLabel(capState.yUnit);
+
+  const resCount = capState.resource === "all" ? activeRes.length : 1;
+  const maxY = yPerBucket * resCount;
+
+  const maxBuckets = 60;
+  const visibleBuckets = buckets.slice(0, maxBuckets);
+
+  // Y axis ticks
+  const yTicks = 5;
+  const yStep = maxY / yTicks;
+  const yTicksArr = [];
+  for (let i = yTicks; i >= 0; i--) yTicksArr.push(Math.round(yStep * i * 10) / 10);
+
+  area.innerHTML = `
+    <div class="section-panel">
+      <div class="section-header">
+        <span class="section-title"><i data-lucide="bar-chart-3"></i> Available Capacity</span>
+        <span class="section-meta">${visibleBuckets.length} buckets · ${resCount} resource${resCount > 1 ? "s" : ""} · max ${maxY}${yLabel}/bucket</span>
+      </div>
+      <div class="cap-chart">
+        <div class="cap-y-axis">
+          ${yTicksArr.map((t) => `<div class="cap-y-tick"><span>${t}${yLabel}</span></div>`).join("")}
+        </div>
+        <div class="cap-bars-area">
+          <div class="cap-grid-lines">
+            ${yTicksArr.map(() => `<div class="cap-grid-line"></div>`).join("")}
+          </div>
+          <div class="cap-bars">
+            ${visibleBuckets.map((b) => {
+              const pct = maxY > 0 ? (maxY / maxY) * 100 : 0;
+              return `
+                <div class="cap-bar-col" title="${b.label}: ${maxY}${yLabel} available">
+                  <div class="cap-bar" style="height:${pct}%"></div>
+                  <span class="cap-bar-label">${b.label}</span>
+                </div>`;
+            }).join("")}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  safeIcons();
+}
+
+function bindCapControls(body, activeRes) {
+  body.querySelectorAll(".cap-horizon-btns .cap-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      capState.horizon = parseInt(btn.dataset.h);
+      renderCapacity(body);
+    });
+  });
+
+  document.getElementById("capXUnit").addEventListener("change", (e) => {
+    capState.xUnit = e.target.value;
+    renderCapacity(body);
+  });
+
+  document.getElementById("capYUnit").addEventListener("change", (e) => {
+    capState.yUnit = e.target.value;
+    renderCapacity(body);
+  });
+
+  document.getElementById("capResource").addEventListener("change", (e) => {
+    capState.resource = e.target.value;
+    renderCapChart(activeRes);
+  });
+}
+
+// ── Statuses ──
 
 async function renderStatuses(body) {
   const data = await api("/api/statuses");
