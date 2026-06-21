@@ -23,6 +23,7 @@ ROUTES = {
         JOIN material_groups mg ON mg.id = m.group_id
         ORDER BY m.id
     """,
+    "/api/calendar": "SELECT * FROM calendar ORDER BY date",
     "/api/resource_groups": "SELECT * FROM resource_groups ORDER BY id",
     "/api/resources": """
         SELECT res.id, res.code, res.description, res.short_desc,
@@ -31,6 +32,16 @@ ROUTES = {
         FROM resources res
         JOIN resource_groups rg ON rg.id = res.group_id
         ORDER BY rg.name, res.code
+    """,
+    "/api/resource_capacity": """
+        SELECT rc.id, rc.resource_id, res.code as resource_code, res.short_desc as resource_name,
+               rg.name as group_name,
+               rc.date_from, rc.date_to, rc.hours_per_day, rc.utilization_rate,
+               ROUND(rc.hours_per_day * rc.utilization_rate, 2) as effective_hours
+        FROM resource_capacity rc
+        JOIN resources res ON res.id = rc.resource_id
+        JOIN resource_groups rg ON rg.id = res.group_id
+        ORDER BY res.code, rc.date_from
     """,
     "/api/routing": """
         SELECT r.id, r.material_group_id, mg.name as group_name,
@@ -93,7 +104,7 @@ MIME = {
 STATIC_FILES = ("index.html", "styles.css", "app.js")
 
 def compute_load():
-    rows = query("""
+    return query("""
         SELECT po.due_date, r.resource_id,
                SUM(r.time_per_unit * po.quantity / 60.0) as hours
         FROM production_orders po
@@ -104,13 +115,26 @@ def compute_load():
           AND ss.name NOT IN ('closed', 'cancelled', 'delivered')
         GROUP BY po.due_date, r.resource_id
     """)
-    return rows
+
+def compute_capacity_by_day():
+    return query("""
+        SELECT c.date, rc.resource_id,
+               CASE WHEN c.is_workday = 1
+                    THEN ROUND(rc.hours_per_day * rc.utilization_rate, 2)
+                    ELSE 0
+               END as available_hours
+        FROM calendar c
+        JOIN resource_capacity rc ON c.date BETWEEN rc.date_from AND rc.date_to
+        ORDER BY c.date, rc.resource_id
+    """)
 
 # ── WSGI app for gunicorn ──
 
 def handle_special(path):
     if path == "/api/load":
         return compute_load()
+    if path == "/api/capacity_by_day":
+        return compute_capacity_by_day()
     return None
 
 def app(environ, start_response):

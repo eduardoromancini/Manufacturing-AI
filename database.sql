@@ -24,6 +24,17 @@ CREATE TABLE IF NOT EXISTS materials (
     FOREIGN KEY (group_id) REFERENCES material_groups(id)
 );
 
+CREATE TABLE IF NOT EXISTS calendar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL UNIQUE,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    day INTEGER NOT NULL,
+    day_of_week INTEGER NOT NULL,
+    week_of_year INTEGER NOT NULL,
+    is_workday INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE TABLE IF NOT EXISTS resource_groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
@@ -39,6 +50,16 @@ CREATE TABLE IF NOT EXISTS resources (
     location TEXT,
     status TEXT DEFAULT 'active',
     FOREIGN KEY (group_id) REFERENCES resource_groups(id)
+);
+
+CREATE TABLE IF NOT EXISTS resource_capacity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource_id INTEGER NOT NULL,
+    date_from TEXT NOT NULL,
+    date_to TEXT NOT NULL,
+    hours_per_day REAL NOT NULL,
+    utilization_rate REAL NOT NULL DEFAULT 1.0,
+    FOREIGN KEY (resource_id) REFERENCES resources(id)
 );
 
 CREATE TABLE IF NOT EXISTS routing (

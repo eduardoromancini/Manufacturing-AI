@@ -8,6 +8,35 @@ conn = sqlite3.connect(db_path)
 conn.execute("PRAGMA foreign_keys = ON")
 conn.executescript(open("database.sql").read())
 
+# Calendar: 2026-01-01 to 2028-12-31
+from datetime import date, timedelta
+
+def iso_week(d):
+    return d.isocalendar()[1]
+
+cal_start = date(2026, 1, 1)
+cal_end = date(2028, 12, 31)
+calendar_rows = []
+d = cal_start
+while d <= cal_end:
+    is_workday = 1 if d.weekday() < 5 else 0
+    calendar_rows.append((
+        d.isoformat(),
+        d.year,
+        d.month,
+        d.day,
+        d.weekday(),
+        iso_week(d),
+        is_workday,
+    ))
+    d += timedelta(days=1)
+
+conn.executemany(
+    "INSERT INTO calendar (date, year, month, day, day_of_week, week_of_year, is_workday) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    calendar_rows,
+)
+print(f"Calendar: {len(calendar_rows)} days ({cal_start} to {cal_end})")
+
 # Sales Status
 statuses = [
     ("draft", "Order created but not yet submitted"),
@@ -47,6 +76,28 @@ resources = [
 conn.executemany(
     "INSERT INTO resources (code, description, short_desc, group_id, capacity, location, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
     resources,
+)
+
+# Resource Capacity: resource_id, date_from, date_to, hours_per_day, utilization_rate
+# Calandras: 2 turnos (16h), 85% utilization
+# Prensas: 3 turnos (24h), 80% utilization
+# Montadoras: 2 turnos (16h), 90% utilization
+resource_capacity = [
+    (1, "2026-01-01", "2028-12-31", 16.0, 0.85),   # CAL-01
+    (2, "2026-01-01", "2028-12-31", 16.0, 0.85),   # CAL-02
+    (3, "2026-01-01", "2028-12-31", 16.0, 0.85),   # CAL-03 (maintenance but has capacity defined)
+    (4, "2026-01-01", "2028-12-31", 24.0, 0.80),   # PRS-01
+    (5, "2026-01-01", "2028-12-31", 24.0, 0.80),   # PRS-02
+    (6, "2026-01-01", "2028-12-31", 24.0, 0.80),   # PRS-03
+    (7, "2026-01-01", "2028-12-31", 24.0, 0.80),   # PRS-04
+    (8, "2026-01-01", "2028-12-31", 16.0, 0.90),   # MNT-01
+    (9, "2026-01-01", "2028-12-31", 16.0, 0.90),   # MNT-02
+    (10, "2026-01-01", "2028-12-31", 16.0, 0.90),  # MNT-03
+    (11, "2026-01-01", "2028-12-31", 16.0, 0.90),  # MNT-04
+]
+conn.executemany(
+    "INSERT INTO resource_capacity (resource_id, date_from, date_to, hours_per_day, utilization_rate) VALUES (?, ?, ?, ?, ?)",
+    resource_capacity,
 )
 
 # Customers

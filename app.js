@@ -739,7 +739,7 @@ async function renderResources(body) {
 
 // ── Capacity ──
 
-const CAP_HOURS_PER_DAY = 24;
+const CAP_HOURS_PER_DAY = 24; // fallback only
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const DAY_NAMES_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -960,6 +960,40 @@ async function renderCapacity(body) {
   safeIcons();
 }
 
+// capMap: { "YYYY-MM-DD": { resourceId: available_hours } }
+function getCapForBucket(b, resourceIds, capMap, yUnit) {
+  let totalHours = 0;
+  if (capState.xUnit === "hours") {
+    const dateStr = fmtIso(b.date);
+    resourceIds.forEach((rid) => {
+      totalHours += (capMap[dateStr]?.[rid] || 0) / CAP_HOURS_PER_DAY;
+    });
+  } else if (capState.xUnit === "days") {
+    const dateStr = fmtIso(b.date);
+    resourceIds.forEach((rid) => {
+      totalHours += (capMap[dateStr]?.[rid] || 0);
+    });
+  } else {
+    const spanDays = b.span || 7;
+    for (let d = 0; d < spanDays; d++) {
+      const dd = addDays(b.date, d);
+      const dateStr = fmtIso(dd);
+      resourceIds.forEach((rid) => {
+        totalHours += (capMap[dateStr]?.[rid] || 0);
+      });
+    }
+  }
+  if (yUnit === "hours") return totalHours;
+  if (yUnit === "days") return totalHours / CAP_HOURS_PER_DAY;
+  if (yUnit === "minutes") return totalHours * 60;
+  if (yUnit === "shifts") return totalHours / 8;
+  return totalHours;
+}
+
+function fmtIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
 // loadMap: { "YYYY-MM-DD": { resourceId: hours, ... } }
 function getLoadForBucket(b, resourceIds, loadMap, yUnit) {
   let totalHours = 0;
@@ -990,14 +1024,15 @@ function getLoadForBucket(b, resourceIds, loadMap, yUnit) {
   return totalHours;
 }
 
-function buildSingleChart(title, subtitle, resCount, buckets, yLabel, resourceIds, loadMap) {
+function buildSingleChart(title, subtitle, resCount, buckets, yLabel, resourceIds, loadMap, capMap) {
   const maxBuckets = 90;
   const visibleBuckets = buckets.slice(0, maxBuckets);
 
   let maxY = 0;
   visibleBuckets.forEach((b) => {
-    const days = b.span || (capState.xUnit === "hours" ? 1/CAP_HOURS_PER_DAY : 1);
-    const val = getYValue(capState.yUnit) * days * resCount;
+    const cap = capMap ? getCapForBucket(b, resourceIds, capMap, capState.yUnit) : 0;
+    const load = loadMap ? getLoadForBucket(b, resourceIds, loadMap, capState.yUnit) : 0;
+    const val = Math.max(cap, load);
     if (val > maxY) maxY = val;
   });
 
@@ -1012,8 +1047,7 @@ function buildSingleChart(title, subtitle, resCount, buckets, yLabel, resourceId
     const isNewWeek = capState.xUnit === "days" && prevWeek !== null && b.weekYear !== prevWeek;
     prevWeek = b.weekYear;
     const separatorClass = isNewWeek ? "cap-week-sep" : "";
-    const bucketDays = b.span || (capState.xUnit === "hours" ? 1/CAP_HOURS_PER_DAY : 1);
-    const capacity = getYValue(capState.yUnit) * bucketDays * resCount;
+    const capacity = capMap ? getCapForBucket(b, resourceIds, capMap, capState.yUnit) : 0;
     const consumed = loadMap ? getLoadForBucket(b, resourceIds, loadMap, capState.yUnit) : 0;
     const available = Math.max(0, capacity - consumed);
     const totalPct = maxY > 0 ? (Math.max(capacity, consumed) / maxY) * 100 : 0;
@@ -1082,13 +1116,21 @@ async function renderCapChart(activeRes, filteredRes) {
 
   const selectedRes = filteredRes.filter((r) => capState.selectedResources === null || capState.selectedResources.has(r.id));
 
-  // Fetch load data and build map: { "YYYY-MM-DD": { resourceId: hours } }
+  // Fetch load data: { "YYYY-MM-DD": { resourceId: hours_consumed } }
   const loadRaw = await api("/api/load");
   const loadMap = {};
   loadRaw.forEach((l) => {
     const d = l.due_date || l.date;
     if (!loadMap[d]) loadMap[d] = {};
     loadMap[d][l.resource_id] = (loadMap[d][l.resource_id] || 0) + l.hours;
+  });
+
+  // Fetch capacity data: { "YYYY-MM-DD": { resourceId: available_hours } }
+  const capRaw = await api("/api/capacity_by_day");
+  const capMap = {};
+  capRaw.forEach((c) => {
+    if (!capMap[c.date]) capMap[c.date] = {};
+    capMap[c.date][c.resource_id] = (capMap[c.date][c.resource_id] || 0) + c.available_hours;
   });
 
   let html = "";
@@ -1100,18 +1142,18 @@ async function renderCapChart(activeRes, filteredRes) {
       const rids = groupRes.map((r) => r.id);
       html += buildSingleChart(g,
         `${groupRes.length} resource${groupRes.length > 1 ? "s" : ""} · ${groupRes.map((r) => r.short_desc).join(", ")}`,
-        groupRes.length, buckets, yLabel, rids, loadMap);
+        groupRes.length, buckets, yLabel, rids, loadMap, capMap);
     });
   } else if (capState.viewBy === "resource") {
     selectedRes.forEach((r) => {
       html += buildSingleChart(r.short_desc, `${r.code} · ${r.group_name}`,
-        1, buckets, yLabel, [r.id], loadMap);
+        1, buckets, yLabel, [r.id], loadMap, capMap);
     });
   } else {
     const rids = selectedRes.map((r) => r.id);
     html += buildSingleChart("All Selected Resources",
       `${selectedRes.length} resource${selectedRes.length > 1 ? "s" : ""}`,
-      selectedRes.length, buckets, yLabel, rids, loadMap);
+      selectedRes.length, buckets, yLabel, rids, loadMap, capMap);
   }
 
   area.innerHTML = `
