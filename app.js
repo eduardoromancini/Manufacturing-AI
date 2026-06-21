@@ -538,73 +538,33 @@ async function renderCustomers(body) {
 
 async function renderMaterials(body) {
   const data = await api("/api/materials");
-  const items = await api("/api/items");
-
-  const usage = {};
-  items.forEach((i) => {
-    if (!usage[i.material_id]) usage[i.material_id] = { qty: 0, total: 0, orders: 0 };
-    usage[i.material_id].qty += i.quantity;
-    usage[i.material_id].total += i.total_price;
-    usage[i.material_id].orders++;
-  });
-
-  const enriched = data.map((r) => {
-    const u = usage[r.id] || { qty: 0, total: 0, orders: 0 };
-    return { ...r, used_in: u.orders, total_qty: u.qty, revenue: u.total };
-  });
 
   body.innerHTML = '<div id="materials-table"></div>';
 
   DataTable(document.getElementById("materials-table"), {
     tableName: "materials",
-    data: enriched,
+    data,
     columns: [
       { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "group_name", label: "Group", render: (v) => `<span class="tag tag-muted">${v}</span>` },
       { key: "description", label: "Description" },
       { key: "unit", label: "Unit", render: (v) => `<span class="tag tag-violet">${v}</span>` },
-      { key: "used_in", label: "Used in", numeric: true, render: (v) => `${v} orders`, rawValue: (v) => v },
-      { key: "total_qty", label: "Total Qty Sold", numeric: true, render: (v) => v.toLocaleString("pt-BR"), rawValue: (v) => v },
-      { key: "revenue", label: "Total Revenue", numeric: true, render: (v) => `<strong>R$ ${fmt(v)}</strong>`, rawValue: (v) => v },
     ],
   });
 }
 
 async function renderMaterialGroups(body) {
   const groups = await api("/api/material_groups");
-  const materials = await api("/api/materials");
-
-  const countByGroup = {};
-  const revenueByGroup = {};
-  materials.forEach((m) => {
-    countByGroup[m.group_id] = (countByGroup[m.group_id] || 0) + 1;
-  });
-
-  const items = await api("/api/items");
-  items.forEach((i) => {
-    const mat = materials.find((m) => m.id === i.material_id);
-    if (mat) {
-      revenueByGroup[mat.group_id] = (revenueByGroup[mat.group_id] || 0) + i.total_price;
-    }
-  });
-
-  const enriched = groups.map((g) => ({
-    ...g,
-    material_count: countByGroup[g.id] || 0,
-    total_revenue: revenueByGroup[g.id] || 0,
-  }));
 
   body.innerHTML = '<div id="material-groups-table"></div>';
 
   DataTable(document.getElementById("material-groups-table"), {
     tableName: "material_groups",
-    data: enriched,
+    data: groups,
     columns: [
       { key: "id", label: "ID", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "name", label: "Group", render: (v) => `<strong>${v}</strong>` },
       { key: "description", label: "Description", render: (v) => v || "—" },
-      { key: "material_count", label: "Materials", numeric: true, rawValue: (v) => v },
-      { key: "total_revenue", label: "Total Revenue", numeric: true, render: (v) => `<strong>R$ ${fmt(v)}</strong>`, rawValue: (v) => v },
     ],
   });
 }
