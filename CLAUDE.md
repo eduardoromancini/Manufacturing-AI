@@ -7,17 +7,55 @@
 - **Always update `database.sql` first**, then `seed_db.py`, then `server.py`, then `app.js`.
 - **Always run `python seed_db.py`** after schema changes to rebuild the database before pushing.
 
-## Database Conventions
+## Database Modeling — Best Practices
 
-- **Third Normal Form (3NF) is mandatory.** Every table must satisfy:
-  - **1NF**: All columns are atomic (no lists, no repeating groups).
-  - **2NF**: Every non-key column depends on the entire primary key (no partial dependencies).
-  - **3NF**: No non-key column depends on another non-key column (no transitive dependencies). If a column can be derived from a JOIN, it must NOT be stored redundantly.
-- All tables use `id INTEGER PRIMARY KEY AUTOINCREMENT`.
-- Foreign keys are explicitly declared with `FOREIGN KEY ... REFERENCES`.
-- Computed columns use `GENERATED ALWAYS AS ... STORED` only for values derived from columns in the SAME row (e.g., `quantity * unit_price`). Never store values derivable from JOINs.
-- Table and column names use `snake_case`.
-- Before adding any column, ask: "Can this be obtained via a JOIN?" If yes, don't add it — use the FK instead.
+### Normalization (mandatory: up to 3NF)
+
+- **1NF — Atomic values**: Every column holds a single value. No arrays, comma-separated lists, JSON blobs, or repeating groups. If you need multiple values, create a child table with FK.
+- **2NF — Full functional dependency**: Every non-key column must depend on the ENTIRE primary key, not just part of it. If a table has a composite key, no column should depend on only one of the key columns. If it does, extract it into its own table.
+- **3NF — No transitive dependencies**: No non-key column should depend on another non-key column. If column B determines column C, then C should be in B's own table, not duplicated here. If a value can be obtained via a JOIN, it must NOT be stored.
+
+### Checklist before adding a column
+
+1. **Is it atomic?** If it contains a list or structure → create a child table (1NF).
+2. **Does it depend on the full PK?** If it depends on only part of a composite key → extract to its own table (2NF).
+3. **Can it be derived from a JOIN?** If yes → don't add it, use the FK relationship (3NF).
+4. **Can it be computed from other columns in the same row?** If yes → use `GENERATED ALWAYS AS ... STORED` (acceptable, same-row derivation).
+5. **Is it a free-text category that repeats?** If the same string appears in multiple rows (e.g., "Calandras", "active") → create a lookup table with FK instead of storing the string.
+
+### Checklist before adding a table
+
+1. **Does it represent a distinct entity or relationship?** Every table must represent exactly one thing.
+2. **Does it have a clear PK?** Use `id INTEGER PRIMARY KEY AUTOINCREMENT`.
+3. **Are FKs explicit?** Every reference to another table must be declared with `FOREIGN KEY ... REFERENCES`.
+4. **Is there a UNIQUE constraint where needed?** Prevent duplicate relationships (e.g., `UNIQUE(material_group_id, resource_id)` on routing).
+
+### Common anti-patterns to avoid
+
+| Anti-pattern | Example | Fix |
+|---|---|---|
+| **Storing derived totals** | `sales_header.total_price` when it's SUM of items | Remove column, compute via `SUM()` in SQL query |
+| **Denormalized category text** | `resources.type = "calandra"` when a group table exists | Replace with `group_id FK → resource_groups` |
+| **Redundant descriptive columns** | Storing `customer_name` in `production_orders` | Only store `customer_id` FK, JOIN for display |
+| **God tables** | One table with 30 columns mixing concerns | Split into entity + detail tables with FK |
+| **Repeating groups** | `phone1`, `phone2`, `phone3` columns | Create `customer_phones` child table |
+| **Computed-only endpoints** | API returns data not persisted in any table | Create the table in SQLite, populate in seed |
+
+### Naming conventions
+
+- Tables: `snake_case`, plural for entities (`customers`), singular for relationships (`routing`).
+- Columns: `snake_case`.
+- FK columns: `<referenced_table_singular>_id` (e.g., `customer_id`, `group_id`).
+- PK: always `id`.
+- Junction/relationship tables: name describes the relationship (`routing`, `production_orders`).
+
+### SQL conventions
+
+- Always declare `FOREIGN KEY ... REFERENCES` explicitly.
+- Use `UNIQUE` constraints to prevent logical duplicates.
+- Use `NOT NULL` on FKs and required fields.
+- Use `DEFAULT` for sensible defaults (`datetime('now')`, `'active'`, etc.).
+- Keep DDL in `database.sql` — never create tables in Python code.
 
 ## Frontend Conventions
 
