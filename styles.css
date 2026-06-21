@@ -855,8 +855,8 @@
 
 .cap-month-bands {
   display: flex;
-  padding: 0 22px 16px;
-  gap: 3px;
+  padding: 0 22px 12px;
+  gap: 0;
 }
 
 .cap-month-bands-spacer {
@@ -866,21 +866,17 @@
 
 .cap-month-band {
   text-align: center;
-  padding: 8px 0;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: var(--teal);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  border-top: 3px solid var(--teal);
-  background: var(--teal-soft);
-  border-radius: 0 0 6px 6px;
+  padding: 4px 0;
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  border-top: 1px solid var(--line);
 }
 
 .cap-month-band.alt {
-  color: var(--violet);
-  border-top-color: var(--violet);
-  background: var(--violet-soft);
+  color: var(--muted);
+  background: #f4f6f8;
 }
 
 /* ── DataTable ── */
