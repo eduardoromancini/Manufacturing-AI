@@ -1360,23 +1360,24 @@ const FS_JOBS = [
 const FS_MACHINES = ["M1", "M2", "M3"];
 
 function fsSchedule(jobOrder) {
-  const machineEnd = new Array(FS_MACHINES.length).fill(0);
+  const nM = FS_MACHINES.length;
+  const nJ = jobOrder.length;
+  const C = Array.from({ length: nJ }, () => new Array(nM).fill(0));
   const schedule = [];
 
-  jobOrder.forEach((ji) => {
+  jobOrder.forEach((ji, jPos) => {
     const job = FS_JOBS[ji];
-    let jobTime = job.release;
-
-    job.tasks.forEach((task, ti) => {
-      const start = Math.max(jobTime, machineEnd[task.m]);
+    job.tasks.forEach((task, mi) => {
+      const prevMachine = mi > 0 ? C[jPos][mi - 1] : job.release;
+      const prevJob = jPos > 0 ? C[jPos - 1][mi] : 0;
+      const start = Math.max(prevMachine, prevJob, mi === 0 ? job.release : 0);
       const end = start + task.d;
-      schedule.push({ job: job.id, jobIdx: ji, machine: task.m, start, end, duration: task.d, color: job.color });
-      machineEnd[task.m] = end;
-      jobTime = end;
+      C[jPos][mi] = end;
+      schedule.push({ job: job.id, jobIdx: ji, machine: mi, start, end, duration: task.d, color: job.color });
     });
   });
 
-  const makespan = Math.max(...machineEnd);
+  const makespan = C[nJ - 1][nM - 1];
   return { schedule, makespan };
 }
 
@@ -1389,29 +1390,13 @@ function fsShuffle() {
   return order;
 }
 
-function fsPermutations(arr) {
-  if (arr.length <= 1) return [arr];
-  const result = [];
-  arr.forEach((v, i) => {
-    const rest = arr.slice(0, i).concat(arr.slice(i + 1));
-    fsPermutations(rest).forEach((p) => result.push([v, ...p]));
+async function fsSolveBackend() {
+  const res = await fetch("/api/flowshop/solve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobs: FS_JOBS }),
   });
-  return result;
-}
-
-function fsOptimize() {
-  const all = fsPermutations([0, 1, 2, 3]);
-  let bestOrder = all[0];
-  let bestMakespan = Infinity;
-
-  all.forEach((order) => {
-    const { makespan } = fsSchedule(order);
-    if (makespan < bestMakespan) {
-      bestMakespan = makespan;
-      bestOrder = [...order];
-    }
-  });
-  return bestOrder;
+  return res.json();
 }
 
 function fsRenderGantt(container, schedule, makespan, title) {
@@ -1519,10 +1504,11 @@ async function renderFlowShop(body) {
 
     <div class="section-panel">
       <div class="section-header">
-        <span class="section-title"><i data-lucide="trophy"></i> Optimized Solution</span>
+        <span class="section-title"><i data-lucide="trophy"></i> Solver Result</span>
       </div>
       <div style="padding:12px 22px">
-        <div id="fsGanttOptimal"></div>
+        <div id="fsSolverIterations"></div>
+        <div id="fsGanttOptimal" style="margin-top:16px"></div>
       </div>
     </div>
   `;
@@ -1540,15 +1526,57 @@ async function renderFlowShop(body) {
     fsRenderGantt(document.getElementById("fsGanttRandom"), schedule, makespan, "Current Sequence");
   }
 
-  function renderOptimal() {
-    const optOrder = fsOptimize();
-    const { schedule, makespan } = fsSchedule(optOrder);
-    const label = "Best Found: " + optOrder.map((i) => FS_JOBS[i].id).join(" → ");
-    fsRenderGantt(document.getElementById("fsGanttOptimal"), schedule, makespan, label);
+  async function renderSolved() {
+    const iterDiv = document.getElementById("fsSolverIterations");
+    const ganttDiv = document.getElementById("fsGanttOptimal");
+    iterDiv.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Solving...</div>';
+    ganttDiv.innerHTML = "";
+    safeIcons();
+
+    const result = await fsSolveBackend();
+
+    iterDiv.innerHTML = `
+      <div style="margin-bottom:12px;font-size:0.78rem;color:var(--muted)">
+        <strong>Method:</strong> ${result.method} · <strong>Time:</strong> ${result.total_time_ms}ms · <strong>${result.n_jobs} jobs × ${result.n_machines} machines</strong>
+      </div>
+      <table class="data-table" style="font-size:0.82rem;margin-bottom:4px">
+        <thead>
+          <tr>
+            <th>Iteration</th>
+            <th>Method</th>
+            <th>Job Order</th>
+            <th class="num">Makespan</th>
+            <th class="num">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${result.iterations.map((it, idx) => {
+            const isBest = idx === result.iterations.length - 1;
+            return `<tr style="${isBest ? "background:var(--green-soft)" : ""}">
+              <td class="mono">${it.iteration}</td>
+              <td>${it.method}</td>
+              <td>${it.order.map((i) => `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.74rem;font-weight:800;color:#fff;background:${FS_JOBS[i].color};margin-right:3px">${FS_JOBS[i].id}</span>`).join("")}</td>
+              <td class="num"><strong>${it.makespan}</strong></td>
+              <td class="num mono">${it.time_ms}ms</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    `;
+
+    const finalSchedule = result.schedule.map((s) => ({
+      ...s,
+      job: FS_JOBS[s.job].id,
+      jobIdx: s.job,
+      color: FS_JOBS[s.job].color,
+    }));
+
+    const label = "Optimal: " + result.optimal_order.map((i) => FS_JOBS[i].id).join(" → ");
+    fsRenderGantt(ganttDiv, finalSchedule, result.optimal_makespan, label);
   }
 
   renderCurrent();
-  renderOptimal();
+  renderSolved();
 
   document.getElementById("fsShuffle").addEventListener("click", () => {
     currentOrder = fsShuffle();
@@ -1556,6 +1584,6 @@ async function renderFlowShop(body) {
   });
 
   document.getElementById("fsOptimize").addEventListener("click", () => {
-    renderOptimal();
+    renderSolved();
   });
 }

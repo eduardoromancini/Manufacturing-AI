@@ -2,6 +2,7 @@ import json
 import sqlite3
 import os
 import http.server
+from solver import solve_flowshop
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE_DIR, "manufacturing.db")
@@ -137,8 +138,29 @@ def handle_special(path):
         return compute_capacity_by_day()
     return None
 
+def handle_post(path, body_bytes):
+    if path == "/api/flowshop/solve":
+        data = json.loads(body_bytes)
+        result = solve_flowshop(data.get("jobs", []))
+        return result
+    return None
+
 def app(environ, start_response):
     path = environ.get("PATH_INFO", "/").split("?")[0]
+    method = environ.get("REQUEST_METHOD", "GET")
+
+    if method == "POST":
+        content_length = int(environ.get("CONTENT_LENGTH", 0))
+        body = environ["wsgi.input"].read(content_length)
+        result = handle_post(path, body)
+        if result is not None:
+            data = json.dumps(result).encode()
+            start_response("200 OK", [
+                ("Content-Type", "application/json"),
+                ("Cache-Control", "no-cache"),
+                ("Content-Length", str(len(data))),
+            ])
+            return [data]
 
     special = handle_special(path)
     if special is not None:
@@ -219,6 +241,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         self.send_response(404)
         self.end_headers()
+
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        result = handle_post(path, body)
+        if result is not None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
 
     def log_message(self, fmt, *args):
         pass
