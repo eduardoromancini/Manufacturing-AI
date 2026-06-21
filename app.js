@@ -1,8 +1,12 @@
 const cache = {};
 let currentSection = "sales";
 
+function safeIcons() {
+  if (typeof lucide !== "undefined") lucide.createIcons({ nameAttr: "data-lucide" });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  lucide.createIcons();
+  safeIcons();
   bindNavigation();
   loadSection(currentSection);
 });
@@ -37,7 +41,7 @@ async function loadSection(name) {
   const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", resources: "Resources", statuses: "Status" };
   count.textContent = labels[name] || name;
   body.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Loading...</div>';
-  lucide.createIcons({ nameAttr: "data-lucide" });
+  safeIcons();
 
   const t0 = performance.now();
   try {
@@ -48,7 +52,7 @@ async function loadSection(name) {
   }
 
   timer.textContent = `${(performance.now() - t0).toFixed(0)}ms`;
-  lucide.createIcons({ nameAttr: "data-lucide" });
+  safeIcons();
   updateTarget();
 }
 
@@ -196,7 +200,7 @@ function DataTable(container, { columns, data, tableName }) {
       </div>
     `;
 
-    lucide.createIcons({ nameAttr: "data-lucide" });
+    safeIcons();
     bindEvents();
   }
 
@@ -436,7 +440,7 @@ async function renderSales(body) {
     </div>
     <div id="sales-table"></div>
   `;
-  lucide.createIcons({ nameAttr: "data-lucide" });
+  safeIcons();
 
   DataTable(document.getElementById("sales-table"), {
     tableName: "sales_header",
@@ -474,7 +478,7 @@ async function renderItems(body) {
     </div>
     <div id="items-table"></div>
   `;
-  lucide.createIcons({ nameAttr: "data-lucide" });
+  safeIcons();
 
   DataTable(document.getElementById("items-table"), {
     tableName: "sales_items",
@@ -589,7 +593,7 @@ async function renderResources(body) {
     </div>
     <div id="resources-table"></div>
   `;
-  lucide.createIcons({ nameAttr: "data-lucide" });
+  safeIcons();
 
   DataTable(document.getElementById("resources-table"), {
     tableName: "resources",
