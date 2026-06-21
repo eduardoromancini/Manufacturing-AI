@@ -1050,13 +1050,11 @@
 .cap-bar-avail {
   background: var(--teal);
   opacity: 0.75;
-  min-height: 0;
 }
 
 .cap-bar-consumed {
   background: var(--amber);
   opacity: 0.85;
-  min-height: 0;
 }
 
 .cap-bar-over {

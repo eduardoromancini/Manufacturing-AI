@@ -952,17 +952,18 @@ function buildSingleChart(title, subtitle, resCount, buckets, yLabel, resourceId
     const capacity = getYValue(capState.yUnit) * bucketDays * resCount;
     const consumed = loadMap ? getLoadForBucket(b, resourceIds, loadMap, capState.yUnit) : 0;
     const available = Math.max(0, capacity - consumed);
-    const consumedPct = maxY > 0 ? (consumed / maxY) * 100 : 0;
-    const availPct = maxY > 0 ? (available / maxY) * 100 : 0;
+    const totalPct = maxY > 0 ? (Math.max(capacity, consumed) / maxY) * 100 : 0;
+    const consumedRatio = capacity > 0 ? consumed / Math.max(capacity, consumed) : 0;
+    const availRatio = 1 - Math.min(consumedRatio, 1);
     const overloaded = consumed > capacity;
     const consumedRound = Math.round(consumed * 10) / 10;
     const availRound = Math.round(available * 10) / 10;
 
     barHtmlParts.push(`
-      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${availRound}${yLabel} available / ${consumedRound}${yLabel} consumed">
-        <div class="cap-bar-stack" style="height:${Math.min(consumedPct + availPct, 100)}%">
-          <div class="cap-bar-avail" style="flex:${availPct}"></div>
-          <div class="cap-bar-consumed ${overloaded ? "cap-bar-over" : ""}" style="flex:${consumedPct}"></div>
+      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${availRound}${yLabel} avail / ${consumedRound}${yLabel} consumed">
+        <div class="cap-bar-stack" style="height:${Math.min(totalPct, 100)}%">
+          ${availRatio > 0 ? `<div class="cap-bar-avail" style="height:${availRatio * 100}%"></div>` : ""}
+          ${consumedRatio > 0 ? `<div class="cap-bar-consumed ${overloaded ? "cap-bar-over" : ""}" style="height:${Math.min(consumedRatio, 1) * 100}%"></div>` : ""}
         </div>
         <div class="cap-bar-labels"><span class="cap-bar-label">${b.label}</span></div>
       </div>`);
