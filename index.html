@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;850&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=21" />
-    <script src="./app.js?v=21" defer></script>
+    <link rel="stylesheet" href="./styles.css?v=22" />
+    <script src="./app.js?v=22" defer></script>
     <script>
       (function(){
         var s=document.createElement("script");
@@ -24,50 +24,66 @@
       <aside class="rail" aria-label="Navigation">
         <div class="rail-brand">
           <p class="eyebrow">Manufacturing.AI</p>
-          <strong>Sales Dashboard</strong>
+          <div class="rail-mode-switcher">
+            <select class="rail-mode-select" id="modeSwitcher">
+              <option value="system" selected>System</option>
+              <option value="learning">Learning</option>
+            </select>
+          </div>
         </div>
 
         <nav class="rail-nav" id="railNav" aria-label="Sections">
-          <a class="rail-link active" href="#" data-section="sales">
-            <i data-lucide="shopping-bag"></i>
-            <span>Sales</span>
-          </a>
-          <a class="rail-link" href="#" data-section="items">
-            <i data-lucide="list"></i>
-            <span>Sales Items</span>
-          </a>
-          <a class="rail-link" href="#" data-section="customers">
-            <i data-lucide="users"></i>
-            <span>Customers</span>
-          </a>
-          <a class="rail-link" href="#" data-section="materials">
-            <i data-lucide="package"></i>
-            <span>Materials</span>
-          </a>
-          <a class="rail-link" href="#" data-section="material_groups">
-            <i data-lucide="folders"></i>
-            <span>Material Groups</span>
-          </a>
-          <a class="rail-link" href="#" data-section="resources">
-            <i data-lucide="factory"></i>
-            <span>Resources</span>
-          </a>
-          <a class="rail-link" href="#" data-section="routing">
-            <i data-lucide="grid-3x3"></i>
-            <span>Routing</span>
-          </a>
-          <a class="rail-link" href="#" data-section="prod_orders">
-            <i data-lucide="clipboard-list"></i>
-            <span>Production Orders</span>
-          </a>
-          <a class="rail-link" href="#" data-section="capacity">
-            <i data-lucide="bar-chart-3"></i>
-            <span>Capacity</span>
-          </a>
-          <a class="rail-link" href="#" data-section="statuses">
-            <i data-lucide="toggle-right"></i>
-            <span>Status</span>
-          </a>
+          <!-- System tabs -->
+          <div class="rail-mode-group" data-mode="system">
+            <a class="rail-link active" href="#" data-section="sales">
+              <i data-lucide="shopping-bag"></i>
+              <span>Sales</span>
+            </a>
+            <a class="rail-link" href="#" data-section="items">
+              <i data-lucide="list"></i>
+              <span>Sales Items</span>
+            </a>
+            <a class="rail-link" href="#" data-section="customers">
+              <i data-lucide="users"></i>
+              <span>Customers</span>
+            </a>
+            <a class="rail-link" href="#" data-section="materials">
+              <i data-lucide="package"></i>
+              <span>Materials</span>
+            </a>
+            <a class="rail-link" href="#" data-section="material_groups">
+              <i data-lucide="folders"></i>
+              <span>Material Groups</span>
+            </a>
+            <a class="rail-link" href="#" data-section="resources">
+              <i data-lucide="factory"></i>
+              <span>Resources</span>
+            </a>
+            <a class="rail-link" href="#" data-section="routing">
+              <i data-lucide="grid-3x3"></i>
+              <span>Routing</span>
+            </a>
+            <a class="rail-link" href="#" data-section="prod_orders">
+              <i data-lucide="clipboard-list"></i>
+              <span>Production Orders</span>
+            </a>
+            <a class="rail-link" href="#" data-section="capacity">
+              <i data-lucide="bar-chart-3"></i>
+              <span>Capacity</span>
+            </a>
+            <a class="rail-link" href="#" data-section="statuses">
+              <i data-lucide="toggle-right"></i>
+              <span>Status</span>
+            </a>
+          </div>
+
+          <!-- Learning tabs -->
+          <div class="rail-mode-group" data-mode="learning" style="display:none">
+            <a class="rail-link" href="#" data-section="learning_home">
+              <i data-lucide="graduation-cap"></i>
+              <span>Welcome</span>
+            </a>
+          </div>
         </nav>
 
         <div class="rail-foot">

@@ -1,5 +1,6 @@
 const cache = {};
 let currentSection = "sales";
+let currentMode = "system";
 
 function safeIcons() {
   if (typeof lucide !== "undefined") lucide.createIcons({ nameAttr: "data-lucide" });
@@ -8,8 +9,27 @@ function safeIcons() {
 document.addEventListener("DOMContentLoaded", () => {
   safeIcons();
   bindNavigation();
+  bindModeSwitcher();
   loadSection(currentSection);
 });
+
+function bindModeSwitcher() {
+  const sel = document.getElementById("modeSwitcher");
+  if (!sel) return;
+  sel.addEventListener("change", () => {
+    currentMode = sel.value;
+    document.querySelectorAll(".rail-mode-group").forEach((g) => {
+      g.style.display = g.dataset.mode === currentMode ? "" : "none";
+    });
+    document.querySelectorAll(".rail-link.active").forEach((l) => l.classList.remove("active"));
+    const firstLink = document.querySelector(`.rail-mode-group[data-mode="${currentMode}"] .rail-link`);
+    if (firstLink) {
+      firstLink.classList.add("active");
+      currentSection = firstLink.dataset.section;
+      loadSection(currentSection);
+    }
+  });
+}
 
 function bindNavigation() {
   document.querySelectorAll(".rail-link").forEach((link) => {
@@ -38,14 +58,14 @@ async function loadSection(name) {
   const count = document.getElementById("stageCount");
   const timer = document.getElementById("loadTime");
 
-  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", routing: "Routing", prod_orders: "Production Orders", capacity: "Capacity", statuses: "Status" };
+  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", routing: "Routing", prod_orders: "Production Orders", capacity: "Capacity", statuses: "Status", learning_home: "Learning" };
   count.textContent = labels[name] || name;
   body.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Loading...</div>';
   safeIcons();
 
   const t0 = performance.now();
   try {
-    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, routing: renderRouting, prod_orders: renderProdOrders, capacity: renderCapacity, statuses: renderStatuses };
+    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, routing: renderRouting, prod_orders: renderProdOrders, capacity: renderCapacity, statuses: renderStatuses, learning_home: renderLearningHome };
     if (renderers[name]) await renderers[name](body);
   } catch (err) {
     body.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${err.message}</p></div>`;
@@ -1310,4 +1330,19 @@ async function renderStatuses(body) {
       { key: "total_value", label: "Total Value", numeric: true, render: (v) => `<strong>R$ ${fmt(v)}</strong>`, rawValue: (v) => v },
     ],
   });
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Learning Mode
+// ════════════════════════════════════════════════════════════════
+
+async function renderLearningHome(body) {
+  body.innerHTML = `
+    <div class="empty-state" style="padding:80px 40px">
+      <i data-lucide="graduation-cap"></i>
+      <h3>Learning Mode</h3>
+      <p>This section will contain interactive learning content. Select a topic from the sidebar to begin.</p>
+    </div>
+  `;
+  safeIcons();
 }

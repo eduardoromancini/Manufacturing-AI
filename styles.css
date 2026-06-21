@@ -61,6 +61,37 @@
   letter-spacing: -0.01em;
 }
 
+.rail-mode-switcher {
+  margin-top: 8px;
+}
+
+.rail-mode-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #eaf0f2;
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa5b4' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.rail-mode-select:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.rail-mode-select option {
+  background: #0e1117;
+  color: #eaf0f2;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: var(--teal);
