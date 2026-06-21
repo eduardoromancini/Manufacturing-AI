@@ -1389,18 +1389,28 @@ function fsShuffle() {
   return order;
 }
 
-function fsOptimize() {
-  let bestOrder = [0, 1, 2, 3];
-  let bestMakespan = fsSchedule(bestOrder).makespan;
+function fsPermutations(arr) {
+  if (arr.length <= 1) return [arr];
+  const result = [];
+  arr.forEach((v, i) => {
+    const rest = arr.slice(0, i).concat(arr.slice(i + 1));
+    fsPermutations(rest).forEach((p) => result.push([v, ...p]));
+  });
+  return result;
+}
 
-  for (let iter = 0; iter < 200; iter++) {
-    const order = fsShuffle();
+function fsOptimize() {
+  const all = fsPermutations([0, 1, 2, 3]);
+  let bestOrder = all[0];
+  let bestMakespan = Infinity;
+
+  all.forEach((order) => {
     const { makespan } = fsSchedule(order);
     if (makespan < bestMakespan) {
       bestMakespan = makespan;
       bestOrder = [...order];
     }
-  }
+  });
   return bestOrder;
 }
 
