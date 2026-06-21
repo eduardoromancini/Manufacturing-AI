@@ -710,7 +710,7 @@ function getYLabel(yUnit) {
   return "h";
 }
 
-let capState = { horizon: 7, xUnit: "days", yUnit: "hours", resource: "all" };
+let capState = { horizon: 7, xUnit: "days", yUnit: "hours", selectedResources: null };
 
 async function renderCapacity(body) {
   const resources = await api("/api/resources");
@@ -746,12 +746,23 @@ async function renderCapacity(body) {
           <option value="shifts" ${capState.yUnit === "shifts" ? "selected" : ""}>Shifts (8h)</option>
         </select>
       </div>
-      <div class="cap-control-group">
-        <label class="cap-label">Resource</label>
-        <select class="cap-select" id="capResource">
-          <option value="all" ${capState.resource === "all" ? "selected" : ""}>All resources (${activeRes.length})</option>
-          ${activeRes.map((r) => `<option value="${r.id}" ${capState.resource == r.id ? "selected" : ""}>${r.code} — ${r.description}</option>`).join("")}
-        </select>
+      <div class="cap-control-group cap-control-full">
+        <div class="cap-resources-header">
+          <label class="cap-label">Resources</label>
+          <button class="cap-toggle-all-btn" id="capToggleAll" type="button">Toggle all</button>
+        </div>
+        <div class="cap-resource-toggles" id="capResourceToggles">
+          ${activeRes.map((r) => {
+            const checked = capState.selectedResources === null || capState.selectedResources.has(r.id);
+            const ts = RESOURCE_TYPE_STYLE[r.type] || { cls: "tag-muted" };
+            return `
+              <label class="cap-resource-toggle ${checked ? "on" : ""}" data-id="${r.id}">
+                <input type="checkbox" ${checked ? "checked" : ""} data-id="${r.id}" />
+                <span class="cap-toggle-code">${r.code}</span>
+                <span class="cap-toggle-desc">${r.description}</span>
+              </label>`;
+          }).join("")}
+        </div>
       </div>
     </div>
     <div id="cap-chart-area"></div>
@@ -771,7 +782,7 @@ function renderCapChart(activeRes) {
   const yPerBucket = getYPerBucket(capState.yUnit, capState.xUnit);
   const yLabel = getYLabel(capState.yUnit);
 
-  const resCount = capState.resource === "all" ? activeRes.length : 1;
+  const resCount = capState.selectedResources === null ? activeRes.length : capState.selectedResources.size;
   const maxY = yPerBucket * resCount;
 
   const maxBuckets = 90;
@@ -889,9 +900,38 @@ function bindCapControls(body, activeRes) {
     renderCapacity(body);
   });
 
-  document.getElementById("capResource").addEventListener("change", (e) => {
-    capState.resource = e.target.value;
-    renderCapChart(activeRes);
+  document.getElementById("capToggleAll").addEventListener("click", () => {
+    const allOn = capState.selectedResources === null || capState.selectedResources.size === activeRes.length;
+    if (allOn) {
+      capState.selectedResources = new Set();
+    } else {
+      capState.selectedResources = null;
+    }
+    renderCapacity(body);
+  });
+
+  document.querySelectorAll("#capResourceToggles input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const id = parseInt(cb.dataset.id);
+      if (capState.selectedResources === null) {
+        capState.selectedResources = new Set(activeRes.map((r) => r.id));
+      }
+      if (cb.checked) {
+        capState.selectedResources.add(id);
+      } else {
+        capState.selectedResources.delete(id);
+      }
+      if (capState.selectedResources.size === activeRes.length) {
+        capState.selectedResources = null;
+      }
+      renderCapChart(activeRes);
+      document.querySelectorAll("#capResourceToggles .cap-resource-toggle").forEach((lbl) => {
+        const lid = parseInt(lbl.dataset.id);
+        const isOn = capState.selectedResources === null || capState.selectedResources.has(lid);
+        lbl.classList.toggle("on", isOn);
+        lbl.querySelector("input").checked = isOn;
+      });
+    });
   });
 }
 

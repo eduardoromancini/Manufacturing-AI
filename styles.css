@@ -743,6 +743,74 @@
   box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
 }
 
+.cap-control-full {
+  width: 100%;
+}
+
+.cap-resources-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cap-toggle-all-btn {
+  border: none;
+  background: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--teal);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.cap-toggle-all-btn:hover {
+  text-decoration: underline;
+}
+
+.cap-resource-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cap-resource-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--panel);
+  opacity: 0.45;
+  user-select: none;
+}
+
+.cap-resource-toggle.on {
+  opacity: 1;
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.cap-resource-toggle input {
+  display: none;
+}
+
+.cap-toggle-code {
+  font-weight: 800;
+  color: var(--ink);
+  font-size: 0.72rem;
+}
+
+.cap-toggle-desc {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
 .cap-chart {
   display: flex;
   padding: 22px 22px 10px;
