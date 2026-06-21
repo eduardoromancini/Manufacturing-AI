@@ -605,16 +605,19 @@ async function renderProdOrders(body) {
     tableName: "production_orders",
     data,
     columns: [
-      { key: "po_id", label: "PO #", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
-      { key: "sales_order", label: "SO #", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "po_id", label: "PO #", render: (v) => `<span class="mono"><strong>${v}</strong></span>`, rawValue: (v) => v },
+      { key: "routing_id", label: "Routing FK", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "sales_header_id", label: "SO FK", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
+      { key: "sales_item_id", label: "Item FK", render: (v) => `<span class="mono">${v}</span>`, rawValue: (v) => v },
       { key: "customer", label: "Customer", render: (v) => `<strong>${v}</strong>` },
       { key: "status", label: "Status", render: (v) => statusTag(v) },
+      { key: "material", label: "Material" },
       { key: "material_group", label: "Mat. Group", render: (v) => `<span class="tag tag-muted">${v}</span>` },
-      { key: "resource_code", label: "Resource", render: (v, row) => `<span class="mono"><strong>${v}</strong></span>` },
+      { key: "resource_code", label: "Resource", render: (v) => `<span class="mono"><strong>${v}</strong></span>` },
       { key: "resource_name", label: "Resource Name" },
       { key: "quantity", label: "Qty", numeric: true, render: (v) => v.toLocaleString("pt-BR"), rawValue: (v) => v },
       { key: "time_per_unit", label: "Time/Unit", numeric: true, render: (v, row) => `${v} ${row.time_unit}`, rawValue: (v) => v },
-      { key: "total_time", label: "Total Time", numeric: true, render: (v, row) => `${v.toLocaleString("pt-BR")} min`, rawValue: (v) => v },
+      { key: "total_time", label: "Total Time", numeric: true, render: (v) => `${v.toLocaleString("pt-BR")} min`, rawValue: (v) => v },
       { key: "total_hours", label: "Total Hours", numeric: true, render: (v) => `${v.toLocaleString("pt-BR")}h`, rawValue: (v) => v },
       { key: "due_date", label: "Due Date", render: (v) => {
         if (!v) return "—";
