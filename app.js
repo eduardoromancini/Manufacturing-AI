@@ -38,14 +38,14 @@ async function loadSection(name) {
   const count = document.getElementById("stageCount");
   const timer = document.getElementById("loadTime");
 
-  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", capacity: "Capacity", statuses: "Status" };
+  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", routing: "Routing", capacity: "Capacity", statuses: "Status" };
   count.textContent = labels[name] || name;
   body.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Loading...</div>';
   safeIcons();
 
   const t0 = performance.now();
   try {
-    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, capacity: renderCapacity, statuses: renderStatuses };
+    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, routing: renderRouting, capacity: renderCapacity, statuses: renderStatuses };
     if (renderers[name]) await renderers[name](body);
   } catch (err) {
     body.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${err.message}</p></div>`;
@@ -567,6 +567,61 @@ async function renderMaterialGroups(body) {
       { key: "description", label: "Description", render: (v) => v || "—" },
     ],
   });
+}
+
+async function renderRouting(body) {
+  const routing = await api("/api/routing");
+  const groups = await api("/api/material_groups");
+  const resources = await api("/api/resources");
+  const activeRes = resources.filter((r) => r.status !== "inactive");
+
+  // Build lookup: { "groupId-resourceId": time_per_unit }
+  const matrix = {};
+  routing.forEach((r) => {
+    matrix[`${r.material_group_id}-${r.resource_id}`] = r;
+  });
+
+  const cellColor = (val) => {
+    if (!val) return "";
+    if (val <= 20) return "rt-fast";
+    if (val <= 50) return "rt-medium";
+    return "rt-slow";
+  };
+
+  body.innerHTML = `
+    <div class="section-panel">
+      <div class="section-header">
+        <span class="section-title"><i data-lucide="grid-3x3"></i> Routing Matrix</span>
+        <span class="section-meta">Time per unit (min) · ${groups.length} groups × ${activeRes.length} resources</span>
+      </div>
+      <div class="rt-matrix-wrap">
+        <table class="rt-matrix">
+          <thead>
+            <tr>
+              <th class="rt-corner"></th>
+              ${activeRes.map((r) => `<th class="rt-res-header"><div class="rt-res-label">${r.short_desc}</div><div class="rt-res-code">${r.code}</div></th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${groups.map((g) => `
+              <tr>
+                <td class="rt-group-cell"><strong>${g.name}</strong></td>
+                ${activeRes.map((r) => {
+                  const entry = matrix[`${g.id}-${r.id}`];
+                  if (entry) {
+                    return `<td class="rt-cell ${cellColor(entry.time_per_unit)}" title="${g.name} → ${r.short_desc}: ${entry.time_per_unit} ${entry.time_unit}"><span class="rt-value">${entry.time_per_unit}</span><span class="rt-unit">${entry.time_unit}</span></td>`;
+                  }
+                  return `<td class="rt-cell rt-empty">—</td>`;
+                }).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  safeIcons();
 }
 
 async function renderResources(body) {

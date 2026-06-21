@@ -32,6 +32,17 @@ CREATE TABLE IF NOT EXISTS resources (
     status TEXT DEFAULT 'active'
 );
 
+CREATE TABLE IF NOT EXISTS routing (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    material_group_id INTEGER NOT NULL,
+    resource_id INTEGER NOT NULL,
+    time_per_unit REAL NOT NULL,
+    time_unit TEXT DEFAULT 'min',
+    FOREIGN KEY (material_group_id) REFERENCES material_groups(id),
+    FOREIGN KEY (resource_id) REFERENCES resources(id),
+    UNIQUE(material_group_id, resource_id)
+);
+
 CREATE TABLE IF NOT EXISTS sales_status (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

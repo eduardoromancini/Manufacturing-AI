@@ -24,6 +24,15 @@ ROUTES = {
         ORDER BY m.id
     """,
     "/api/resources": "SELECT * FROM resources ORDER BY type, code",
+    "/api/routing": """
+        SELECT r.id, r.material_group_id, mg.name as group_name,
+               r.resource_id, res.code as resource_code, res.short_desc as resource_name,
+               r.time_per_unit, r.time_unit
+        FROM routing r
+        JOIN material_groups mg ON mg.id = r.material_group_id
+        JOIN resources res ON res.id = r.resource_id
+        ORDER BY r.material_group_id, r.resource_id
+    """,
     "/api/statuses": "SELECT * FROM sales_status ORDER BY id",
     "/api/sales": """
         SELECT sh.id, sh.customer_id, c.name as customer_name,

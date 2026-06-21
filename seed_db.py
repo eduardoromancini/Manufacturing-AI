@@ -94,6 +94,43 @@ materials = [
 ]
 conn.executemany("INSERT INTO materials (description, unit, group_id) VALUES (?, ?, ?)", materials)
 
+# Routing: material_group_id, resource_id, time_per_unit (min)
+# Groups: 1=Cabo Leve, 2=Cabo Pesada, 3=Textil Leve, 4=Textil Pesada
+# Resources: 1=CAL-01, 2=CAL-02, 3=CAL-03, 4=PRS-01, 5=PRS-02, 6=PRS-03, 7=PRS-04, 8=MNT-01, 9=MNT-02, 10=MNT-03, 11=MNT-04
+routing = [
+    # Cabo Leve
+    (1, 1, 20, "min"),   # CAL-01: 20 min/un
+    (1, 2, 25, "min"),   # CAL-02: 25 min/un
+    (1, 4, 45, "min"),   # PRS-01: 45 min/un
+    (1, 5, 50, "min"),   # PRS-02: 50 min/un
+    (1, 8, 60, "min"),   # MNT-01: 60 min/un
+    (1, 9, 65, "min"),   # MNT-02: 65 min/un
+
+    # Cabo Pesada
+    (2, 1, 35, "min"),   # CAL-01: 35 min/un
+    (2, 4, 90, "min"),   # PRS-01: 90 min/un
+    (2, 6, 70, "min"),   # PRS-03: 70 min/un
+    (2, 8, 120, "min"),  # MNT-01: 120 min/un
+
+    # Textil Leve
+    (3, 1, 12, "min"),   # CAL-01: 12 min/un
+    (3, 2, 15, "min"),   # CAL-02: 15 min/un
+    (3, 5, 30, "min"),   # PRS-02: 30 min/un
+    (3, 6, 25, "min"),   # PRS-03: 25 min/un
+    (3, 7, 20, "min"),   # PRS-04: 20 min/un
+    (3, 10, 40, "min"),  # MNT-03: 40 min/un
+
+    # Textil Pesada
+    (4, 1, 18, "min"),   # CAL-01: 18 min/un
+    (4, 2, 22, "min"),   # CAL-02: 22 min/un
+    (4, 4, 55, "min"),   # PRS-01: 55 min/un
+    (4, 5, 60, "min"),   # PRS-02: 60 min/un
+    (4, 8, 80, "min"),   # MNT-01: 80 min/un
+    (4, 9, 85, "min"),   # MNT-02: 85 min/un
+    (4, 10, 50, "min"),  # MNT-03: 50 min/un
+]
+conn.executemany("INSERT INTO routing (material_group_id, resource_id, time_per_unit, time_unit) VALUES (?, ?, ?, ?)", routing)
+
 # Sales headers (status_id: 1=draft,2=pending,3=approved,4=in_production,5=shipped,6=delivered,7=invoiced,8=closed,9=cancelled)
 sales = [
     (1, 8, 0),   # Vale - closed
