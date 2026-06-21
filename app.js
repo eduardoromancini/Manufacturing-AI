@@ -58,14 +58,14 @@ async function loadSection(name) {
   const count = document.getElementById("stageCount");
   const timer = document.getElementById("loadTime");
 
-  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", routing: "Routing", prod_orders: "Production Orders", capacity: "Capacity", statuses: "Status", learning_home: "Learning" };
+  const labels = { sales: "Sales", items: "Sales Items", customers: "Customers", materials: "Materials", material_groups: "Material Groups", resources: "Resources", routing: "Routing", prod_orders: "Production Orders", capacity: "Capacity", statuses: "Status", learning_home: "Learning", learning_flowshop: "Flow Shop" };
   count.textContent = labels[name] || name;
   body.innerHTML = '<div class="loading"><i data-lucide="loader-2" class="spin"></i> Loading...</div>';
   safeIcons();
 
   const t0 = performance.now();
   try {
-    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, routing: renderRouting, prod_orders: renderProdOrders, capacity: renderCapacity, statuses: renderStatuses, learning_home: renderLearningHome };
+    const renderers = { sales: renderSales, items: renderItems, customers: renderCustomers, materials: renderMaterials, material_groups: renderMaterialGroups, resources: renderResources, routing: renderRouting, prod_orders: renderProdOrders, capacity: renderCapacity, statuses: renderStatuses, learning_home: renderLearningHome, learning_flowshop: renderFlowShop };
     if (renderers[name]) await renderers[name](body);
   } catch (err) {
     body.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${err.message}</p></div>`;
@@ -1345,4 +1345,207 @@ async function renderLearningHome(body) {
     </div>
   `;
   safeIcons();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Flow Shop Simulator
+// ════════════════════════════════════════════════════════════════
+
+const FS_JOBS = [
+  { id: "J1", color: "#0f766e", release: 0, tasks: [{ m: 0, d: 3 }, { m: 1, d: 4 }, { m: 2, d: 2 }] },
+  { id: "J2", color: "#5b5bd6", release: 2, tasks: [{ m: 0, d: 5 }, { m: 1, d: 3 }, { m: 2, d: 7 }] },
+  { id: "J3", color: "#c84622", release: 7, tasks: [{ m: 0, d: 2 }, { m: 1, d: 1 }, { m: 2, d: 4 }] },
+  { id: "J4", color: "#b7791f", release: 9, tasks: [{ m: 0, d: 1 }, { m: 1, d: 6 }, { m: 2, d: 5 }] },
+];
+const FS_MACHINES = ["M1", "M2", "M3"];
+
+function fsSchedule(jobOrder) {
+  const machineEnd = new Array(FS_MACHINES.length).fill(0);
+  const schedule = [];
+
+  jobOrder.forEach((ji) => {
+    const job = FS_JOBS[ji];
+    let jobTime = job.release;
+
+    job.tasks.forEach((task, ti) => {
+      const start = Math.max(jobTime, machineEnd[task.m]);
+      const end = start + task.d;
+      schedule.push({ job: job.id, jobIdx: ji, machine: task.m, start, end, duration: task.d, color: job.color });
+      machineEnd[task.m] = end;
+      jobTime = end;
+    });
+  });
+
+  const makespan = Math.max(...machineEnd);
+  return { schedule, makespan };
+}
+
+function fsShuffle() {
+  const order = [0, 1, 2, 3];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+function fsOptimize() {
+  let bestOrder = [0, 1, 2, 3];
+  let bestMakespan = fsSchedule(bestOrder).makespan;
+
+  for (let iter = 0; iter < 200; iter++) {
+    const order = fsShuffle();
+    const { makespan } = fsSchedule(order);
+    if (makespan < bestMakespan) {
+      bestMakespan = makespan;
+      bestOrder = [...order];
+    }
+  }
+  return bestOrder;
+}
+
+function fsRenderGantt(container, schedule, makespan, title) {
+  const pxPerUnit = Math.min(40, Math.max(16, (container.offsetWidth - 80) / makespan));
+  const barH = 32;
+  const rowH = 44;
+  const labelW = 40;
+  const chartW = makespan * pxPerUnit;
+
+  const ticks = [];
+  for (let t = 0; t <= makespan; t++) ticks.push(t);
+
+  let html = `
+    <div class="fs-gantt-header">
+      <span class="fs-gantt-title">${title}</span>
+      <span class="fs-gantt-makespan">Makespan: <strong>${makespan}</strong></span>
+    </div>
+    <div class="fs-gantt-wrap">
+      <div class="fs-gantt" style="width:${labelW + chartW + 20}px">
+        <div class="fs-gantt-ticks" style="margin-left:${labelW}px;width:${chartW}px">
+          ${ticks.map((t) => `<div class="fs-tick" style="left:${t * pxPerUnit}px"><span>${t}</span></div>`).join("")}
+        </div>
+  `;
+
+  FS_MACHINES.forEach((mName, mi) => {
+    const mTasks = schedule.filter((s) => s.machine === mi);
+    html += `
+      <div class="fs-gantt-row" style="height:${rowH}px">
+        <div class="fs-gantt-label" style="width:${labelW}px">${mName}</div>
+        <div class="fs-gantt-bars" style="width:${chartW}px">
+          ${mTasks.map((t) => `
+            <div class="fs-bar" style="left:${t.start * pxPerUnit}px;width:${t.duration * pxPerUnit}px;height:${barH}px;background:${t.color}" title="${t.job} on ${mName}: t=${t.start}→${t.end} (${t.duration}u)">
+              <span class="fs-bar-label">${t.job}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div></div>`;
+  container.innerHTML = html;
+}
+
+async function renderFlowShop(body) {
+  body.innerHTML = `
+    <div class="section-panel" style="margin-bottom:20px">
+      <div class="section-header">
+        <span class="section-title"><i data-lucide="book-open"></i> Flow Shop Scheduling — Theory</span>
+      </div>
+      <div style="padding:20px 22px;font-size:0.88rem;line-height:1.7;color:var(--ink)">
+        <p><strong>Flow Shop</strong> is a scheduling problem where <em>n</em> jobs must be processed on <em>m</em> machines, all in the <strong>same order</strong>. Each job visits M1 → M2 → M3 sequentially.</p>
+        <p style="margin-top:12px"><strong>Rules:</strong></p>
+        <ul style="margin:8px 0 0 20px;padding:0">
+          <li>Each machine processes one job at a time (no overlap on the same machine)</li>
+          <li>A job can only start on the next machine after finishing the current one</li>
+          <li>Jobs have <strong>release dates</strong> — the earliest time they can begin</li>
+          <li>The goal is to <strong>minimize makespan</strong> — the total time to complete all jobs</li>
+        </ul>
+        <p style="margin-top:12px"><strong>This example:</strong> 4 jobs (J1–J4) on 3 machines (M1–M3), based on the ProcessScheduler flow shop use case.</p>
+
+        <div style="margin-top:16px;overflow-x:auto">
+          <table class="data-table" style="font-size:0.82rem">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Release</th>
+                <th>M1 (duration)</th>
+                <th>M2 (duration)</th>
+                <th>M3 (duration)</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${FS_JOBS.map((j) => `
+                <tr>
+                  <td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${j.color};margin-right:6px"></span><strong>${j.id}</strong></td>
+                  <td>t=${j.release}</td>
+                  ${j.tasks.map((t) => `<td>${t.d} units</td>`).join("")}
+                  <td><strong>${j.tasks.reduce((a, t) => a + t.d, 0)} units</strong></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-panel" style="margin-bottom:20px">
+      <div class="section-header">
+        <span class="section-title"><i data-lucide="play"></i> Interactive Simulator</span>
+        <div style="display:flex;gap:8px">
+          <button class="ghost-btn" id="fsShuffle" type="button"><i data-lucide="shuffle"></i><span>Shuffle</span></button>
+          <button class="cta" id="fsOptimize" type="button"><i data-lucide="sparkles"></i><span>Optimize</span></button>
+        </div>
+      </div>
+      <div style="padding:12px 22px">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+          <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase">Job Order:</span>
+          <div id="fsOrderChips" style="display:flex;gap:6px"></div>
+        </div>
+        <div id="fsGanttRandom"></div>
+      </div>
+    </div>
+
+    <div class="section-panel">
+      <div class="section-header">
+        <span class="section-title"><i data-lucide="trophy"></i> Optimized Solution</span>
+      </div>
+      <div style="padding:12px 22px">
+        <div id="fsGanttOptimal"></div>
+      </div>
+    </div>
+  `;
+  safeIcons();
+
+  let currentOrder = [0, 1, 2, 3];
+
+  function renderCurrent() {
+    const { schedule, makespan } = fsSchedule(currentOrder);
+    const chips = document.getElementById("fsOrderChips");
+    chips.innerHTML = currentOrder.map((ji) => {
+      const j = FS_JOBS[ji];
+      return `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:6px;font-size:0.82rem;font-weight:800;color:#fff;background:${j.color}">${j.id}</span>`;
+    }).join("");
+    fsRenderGantt(document.getElementById("fsGanttRandom"), schedule, makespan, "Current Sequence");
+  }
+
+  function renderOptimal() {
+    const optOrder = fsOptimize();
+    const { schedule, makespan } = fsSchedule(optOrder);
+    const label = "Best Found: " + optOrder.map((i) => FS_JOBS[i].id).join(" → ");
+    fsRenderGantt(document.getElementById("fsGanttOptimal"), schedule, makespan, label);
+  }
+
+  renderCurrent();
+  renderOptimal();
+
+  document.getElementById("fsShuffle").addEventListener("click", () => {
+    currentOrder = fsShuffle();
+    renderCurrent();
+  });
+
+  document.getElementById("fsOptimize").addEventListener("click", () => {
+    renderOptimal();
+  });
 }
