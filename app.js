@@ -782,48 +782,40 @@ function renderCapChart(activeRes) {
   const yTicksArr = [];
   for (let i = yTicks; i >= 0; i--) yTicksArr.push(Math.round(yStep * i * 100) / 100);
 
-  // Build month/week separator info
-  let prevMonth = null;
+  // Build week separators (dashed line only, no month line)
   let prevWeek = null;
   const barHtmlParts = [];
 
-  visibleBuckets.forEach((b, idx) => {
-    const isNewMonth = prevMonth !== null && b.month !== prevMonth;
+  visibleBuckets.forEach((b) => {
     const isNewWeek = capState.xUnit === "days" && prevWeek !== null && b.weekYear !== prevWeek;
-    prevMonth = b.month;
     prevWeek = b.weekYear;
 
-    let separatorClass = "";
-    if (isNewMonth) separatorClass = "cap-month-sep";
-    else if (isNewWeek) separatorClass = "cap-week-sep";
-
+    const separatorClass = isNewWeek ? "cap-week-sep" : "";
     const pct = maxY > 0 ? 100 : 0;
 
     barHtmlParts.push(`
-      <div class="cap-bar-col ${separatorClass}" title="${b.sublabel} ${b.label}: ${maxY}${yLabel}">
+      <div class="cap-bar-col ${separatorClass}" title="${b.label}: ${maxY}${yLabel}">
         <div class="cap-bar" style="height:${pct}%"></div>
         <div class="cap-bar-labels">
           <span class="cap-bar-label">${b.label}</span>
-          <span class="cap-bar-sublabel">${b.sublabel}</span>
         </div>
       </div>`);
   });
 
-  // Month header bands
+  // Month bands below chart
   const monthBands = [];
-  if (capState.xUnit === "days" || capState.xUnit === "hours") {
+  if (visibleBuckets.length > 0) {
     let runStart = 0;
-    let runMonth = visibleBuckets[0]?.month;
-    visibleBuckets.forEach((b, i) => {
-      if (b.month !== runMonth || i === visibleBuckets.length - 1) {
-        const end = b.month !== runMonth ? i : i + 1;
-        const m = runMonth;
+    let runMonth = visibleBuckets[0].month;
+    for (let i = 1; i <= visibleBuckets.length; i++) {
+      const cur = i < visibleBuckets.length ? visibleBuckets[i].month : -1;
+      if (cur !== runMonth) {
         const yr = visibleBuckets[runStart].date.getFullYear();
-        monthBands.push({ start: runStart, span: end - runStart, label: `${MONTH_NAMES[m]} ${yr}` });
+        monthBands.push({ span: i - runStart, label: `${MONTH_NAMES[runMonth]} ${yr}` });
         runStart = i;
-        runMonth = b.month;
+        runMonth = cur;
       }
-    });
+    }
   }
 
   area.innerHTML = `
@@ -832,11 +824,6 @@ function renderCapChart(activeRes) {
         <span class="section-title"><i data-lucide="bar-chart-3"></i> Available Capacity</span>
         <span class="section-meta">${visibleBuckets.length} buckets · ${resCount} resource${resCount > 1 ? "s" : ""} · max ${maxY}${yLabel}/bucket</span>
       </div>
-      ${monthBands.length > 1 ? `
-        <div class="cap-month-bands">
-          ${monthBands.map((mb) => `<div class="cap-month-band" style="flex:${mb.span}"><span>${mb.label}</span></div>`).join("")}
-        </div>
-      ` : ""}
       <div class="cap-chart">
         <div class="cap-y-axis">
           ${yTicksArr.map((t) => `<div class="cap-y-tick"><span>${t}${yLabel}</span></div>`).join("")}
@@ -850,6 +837,12 @@ function renderCapChart(activeRes) {
           </div>
         </div>
       </div>
+      ${monthBands.length > 0 ? `
+        <div class="cap-month-bands">
+          <div class="cap-month-bands-spacer"></div>
+          ${monthBands.map((mb, i) => `<div class="cap-month-band ${i % 2 === 1 ? "alt" : ""}" style="flex:${mb.span}"><span>${mb.label}</span></div>`).join("")}
+        </div>
+      ` : ""}
     </div>
   `;
 
