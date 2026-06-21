@@ -724,6 +724,32 @@
   border-color: var(--teal);
 }
 
+.cap-btn-sm {
+  padding: 4px 8px;
+  font-size: 0.72rem;
+}
+
+.cap-horizon-cascade {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cap-horizon-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cap-horizon-row-label {
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 56px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .cap-start-date-wrap {
   display: flex;
   gap: 6px;

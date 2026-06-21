@@ -737,14 +737,55 @@ async function renderCapacity(body) {
           <button class="cap-btn cap-today-btn ${capState.startDate === todayStr() ? "active" : ""}" id="capToday" type="button">Today</button>
         </div>
       </div>
-      <div class="cap-control-group">
+      <div class="cap-control-group cap-control-full">
         <label class="cap-label">Horizon</label>
-        <div class="cap-horizon-btns">
-          <button class="cap-btn ${capState.horizon === 1 ? "active" : ""}" data-h="1">1 day</button>
-          <button class="cap-btn ${capState.horizon === 7 ? "active" : ""}" data-h="7">7 days</button>
-          <button class="cap-btn ${capState.horizon === 14 ? "active" : ""}" data-h="14">14 days</button>
-          <button class="cap-btn ${capState.horizon === 30 ? "active" : ""}" data-h="30">30 days</button>
-          <button class="cap-btn ${capState.horizon === 90 ? "active" : ""}" data-h="90">90 days</button>
+        <div class="cap-horizon-cascade">
+          <div class="cap-horizon-row">
+            <span class="cap-horizon-row-label">Year</span>
+            <div class="cap-horizon-btns">
+              ${[2026,2027,2028].map((y) => `<button class="cap-btn ${capState.horizon === "y"+y ? "active" : ""}" data-h="y${y}">${y}</button>`).join("")}
+            </div>
+          </div>
+          <div class="cap-horizon-row">
+            <span class="cap-horizon-row-label">Semester</span>
+            <div class="cap-horizon-btns">
+              <button class="cap-btn ${capState.horizon === "s1" ? "active" : ""}" data-h="s1">S1</button>
+              <button class="cap-btn ${capState.horizon === "s2" ? "active" : ""}" data-h="s2">S2</button>
+            </div>
+          </div>
+          <div class="cap-horizon-row">
+            <span class="cap-horizon-row-label">Quarter</span>
+            <div class="cap-horizon-btns">
+              <button class="cap-btn ${capState.horizon === "q1" ? "active" : ""}" data-h="q1">Q1</button>
+              <button class="cap-btn ${capState.horizon === "q2" ? "active" : ""}" data-h="q2">Q2</button>
+              <button class="cap-btn ${capState.horizon === "q3" ? "active" : ""}" data-h="q3">Q3</button>
+              <button class="cap-btn ${capState.horizon === "q4" ? "active" : ""}" data-h="q4">Q4</button>
+            </div>
+          </div>
+          <div class="cap-horizon-row">
+            <span class="cap-horizon-row-label">Month</span>
+            <div class="cap-horizon-btns">
+              ${MONTH_NAMES.map((m, i) => `<button class="cap-btn cap-btn-sm ${capState.horizon === "m"+(i+1) ? "active" : ""}" data-h="m${i+1}">${m}</button>`).join("")}
+            </div>
+          </div>
+          <div class="cap-horizon-row">
+            <span class="cap-horizon-row-label">Weeks</span>
+            <div class="cap-horizon-btns">
+              <button class="cap-btn ${capState.horizon === 7 ? "active" : ""}" data-h="7">1w</button>
+              <button class="cap-btn ${capState.horizon === 14 ? "active" : ""}" data-h="14">2w</button>
+              <button class="cap-btn ${capState.horizon === 21 ? "active" : ""}" data-h="21">3w</button>
+              <button class="cap-btn ${capState.horizon === 28 ? "active" : ""}" data-h="28">4w</button>
+            </div>
+          </div>
+          <div class="cap-horizon-row">
+            <span class="cap-horizon-row-label">Days</span>
+            <div class="cap-horizon-btns">
+              <button class="cap-btn ${capState.horizon === 1 ? "active" : ""}" data-h="1">1d</button>
+              <button class="cap-btn ${capState.horizon === 3 ? "active" : ""}" data-h="3">3d</button>
+              <button class="cap-btn ${capState.horizon === 5 ? "active" : ""}" data-h="5">5d</button>
+              <button class="cap-btn ${capState.horizon === 10 ? "active" : ""}" data-h="10">10d</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="cap-control-group">
@@ -924,7 +965,36 @@ function bindCapControls(body, activeRes) {
 
   body.querySelectorAll(".cap-horizon-btns .cap-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      capState.horizon = parseInt(btn.dataset.h);
+      const h = btn.dataset.h;
+      const startD = new Date(capState.startDate + "T00:00:00");
+      const yr = startD.getFullYear();
+
+      if (h.startsWith("y")) {
+        const y = parseInt(h.slice(1));
+        capState.startDate = `${y}-01-01`;
+        capState.horizon = (y % 4 === 0 ? 366 : 365);
+      } else if (h === "s1") {
+        capState.startDate = `${yr}-01-01`;
+        capState.horizon = (yr % 4 === 0 ? 182 : 181);
+      } else if (h === "s2") {
+        capState.startDate = `${yr}-07-01`;
+        capState.horizon = (yr % 4 === 0 ? 184 : 184);
+      } else if (h.startsWith("q")) {
+        const q = parseInt(h.slice(1));
+        const qStart = [0, 0, 3, 6, 9][q];
+        capState.startDate = `${yr}-${String(qStart+1).padStart(2,"0")}-01`;
+        const s = new Date(yr, qStart, 1);
+        const e = new Date(yr, qStart + 3, 1);
+        capState.horizon = Math.round((e - s) / 86400000);
+      } else if (h.startsWith("m")) {
+        const m = parseInt(h.slice(1));
+        capState.startDate = `${yr}-${String(m).padStart(2,"0")}-01`;
+        const s = new Date(yr, m - 1, 1);
+        const e = new Date(yr, m, 1);
+        capState.horizon = Math.round((e - s) / 86400000);
+      } else {
+        capState.horizon = parseInt(h);
+      }
       renderCapacity(body);
     });
   });
