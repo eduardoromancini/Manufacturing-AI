@@ -662,7 +662,8 @@ function buildBuckets(startDate, horizonDays, xUnit) {
     for (let i = 0; i < horizonDays; i++) {
       const d = addDays(start, i);
       const dow = DAY_NAMES_SHORT[d.getDay()];
-      buckets.push({ label: `${fmtDateShort(d)}`, sublabel: dow, date: d, month: d.getMonth(), weekYear: getISOWeek(d) });
+      const dd = String(d.getDate()).padStart(2, "0");
+      buckets.push({ label: `${dow} ${dd}`, sublabel: dow, date: d, month: d.getMonth(), weekYear: getISOWeek(d) });
     }
   } else if (xUnit === "weeks") {
     const weeks = Math.ceil(horizonDays / 7);
@@ -802,6 +803,21 @@ function renderCapChart(activeRes) {
       </div>`);
   });
 
+  // Week bands below chart
+  const weekBands = [];
+  if (capState.xUnit === "days" && visibleBuckets.length > 0) {
+    let runStart = 0;
+    let runWeek = visibleBuckets[0].weekYear;
+    for (let i = 1; i <= visibleBuckets.length; i++) {
+      const cur = i < visibleBuckets.length ? visibleBuckets[i].weekYear : -1;
+      if (cur !== runWeek) {
+        weekBands.push({ span: i - runStart, label: `W${runWeek}` });
+        runStart = i;
+        runWeek = cur;
+      }
+    }
+  }
+
   // Month bands below chart
   const monthBands = [];
   if (visibleBuckets.length > 0) {
@@ -837,9 +853,15 @@ function renderCapChart(activeRes) {
           </div>
         </div>
       </div>
+      ${weekBands.length > 0 ? `
+        <div class="cap-week-bands">
+          <div class="cap-bands-spacer"></div>
+          ${weekBands.map((wb, i) => `<div class="cap-week-band ${i % 2 === 1 ? "alt" : ""}" style="flex:${wb.span}"><span>${wb.label}</span></div>`).join("")}
+        </div>
+      ` : ""}
       ${monthBands.length > 0 ? `
         <div class="cap-month-bands">
-          <div class="cap-month-bands-spacer"></div>
+          <div class="cap-bands-spacer"></div>
           ${monthBands.map((mb, i) => `<div class="cap-month-band ${i % 2 === 1 ? "alt" : ""}" style="flex:${mb.span}"><span>${mb.label}</span></div>`).join("")}
         </div>
       ` : ""}

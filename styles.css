@@ -853,29 +853,47 @@
   padding-left: 2px;
 }
 
+.cap-bands-spacer {
+  width: 48px;
+  flex-shrink: 0;
+}
+
+.cap-week-bands {
+  display: flex;
+  padding: 0 22px 0;
+  gap: 3px;
+}
+
+.cap-week-band {
+  text-align: center;
+  padding: 3px 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.cap-week-band.alt {
+  background: #f8f9fb;
+}
+
 .cap-month-bands {
   display: flex;
   padding: 0 22px 12px;
-  gap: 0;
-}
-
-.cap-month-bands-spacer {
-  width: 48px;
-  flex-shrink: 0;
+  gap: 3px;
 }
 
 .cap-month-band {
   text-align: center;
   padding: 4px 0;
   font-size: 0.64rem;
-  font-weight: 700;
+  font-weight: 750;
   color: var(--muted);
   letter-spacing: 0.02em;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-strong);
 }
 
 .cap-month-band.alt {
-  color: var(--muted);
   background: #f4f6f8;
 }
 
